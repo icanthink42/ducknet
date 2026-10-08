@@ -352,10 +352,64 @@ local function configureSite()
   io.write("activated /etc/ducknet/site.lua\n")
 end
 
+local function configureStartup(role)
+  assert(role == "router" or role == "server", "invalid startup role")
+  if isComputerCraft then
+    makeDirectory("/startup")
+    local opposite = role == "router" and "/startup/ducknet-server.lua" or
+      "/startup/ducknet-router.lua"
+    if exists(opposite) then remove(opposite) end
+    local program = role == "router" and "/duck-router.lua" or "/duckserve.lua"
+    local arguments = role == "server" and (", " .. quote("/etc/ducknet/site.lua")) or ""
+    local body = "print(" .. quote("Starting DuckNet " .. role .. "...") .. ")\n" ..
+      "local ok = shell.run(" .. quote(program) .. arguments .. ")\n" ..
+      "if not ok then printError(" .. quote("DuckNet " .. role .. " stopped") .. ") end\n"
+    assert(load(body, "=ducknet-startup"))
+    writeAtomic("/startup/ducknet-" .. role .. ".lua", body)
+  else
+    local opposite = role == "router" and "ducknet-server" or "ducknet-router"
+    local oppositePath = "/etc/rc.d/" .. opposite .. ".lua"
+    local shell = require("shell")
+    if exists(oppositePath) then
+      pcall(shell.execute, "rc " .. opposite .. " disable")
+      remove(oppositePath)
+    end
+    local program = role == "router" and "/usr/bin/duck-router.lua" or
+      "/usr/bin/duckserve.lua"
+    local argument = role == "server" and "/etc/ducknet/site.lua" or nil
+    local lines = {
+      "local worker",
+      "function start()",
+      "  if worker and worker:status() == \"running\" then return end",
+      "  worker = require(\"thread\").create(function()",
+      "    local program = assert(loadfile(" .. quote(program) .. "))"
+    }
+    if argument then
+      lines[#lines + 1] = "    program(" .. quote(argument) .. ")"
+    else
+      lines[#lines + 1] = "    program()"
+    end
+    lines[#lines + 1] = "  end):detach()"
+    lines[#lines + 1] = "end"
+    lines[#lines + 1] = "function stop()"
+    lines[#lines + 1] = "  if worker then worker:kill(); worker = nil end"
+    lines[#lines + 1] = "end"
+    local body = table.concat(lines, "\n") .. "\n"
+    assert(load(body, "=ducknet-rc-service"))
+    local service = "ducknet-" .. role
+    writeAtomic("/etc/rc.d/" .. service .. ".lua", body)
+    pcall(shell.execute, "rc " .. service .. " disable")
+    local enabled, reason = shell.execute("rc " .. service .. " enable")
+    assert(enabled, "could not enable startup service: " .. tostring(reason))
+  end
+  io.write("enabled DuckNet " .. role .. " at startup\n")
+end
+
 if profile == "client" or profile == "router" or profile == "server" then
   configureNetwork(profile)
 end
 if profile == "server" then configureSite() end
+if profile == "router" or profile == "server" then configureStartup(profile) end
 
 io.write("\nDuckNet installed for " .. (isComputerCraft and "CC:Tweaked" or "OpenComputers") ..
   " from " .. (useBundle and "release " or "branch ") .. branch .. ".\n")

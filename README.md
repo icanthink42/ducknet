@@ -48,7 +48,9 @@ Client, router, and server profiles guide you through network configuration.
 The server profile can activate the bundled Foo Bar test or Hello World site,
 or download a DuckNet server application from a GitHub raw/blob URL. Start a
 configured server with `duckserve /etc/ducknet/site.lua`, or a router with
-`duck-router`.
+`duck-router`. Router and server profiles also install and enable the matching
+startup service automatically. Rebooting the computer resumes its configured
+role without another command.
 
 Every push to `main` is tested and published automatically. The release pipeline
 increments the latest semantic patch version, tags the tested commit, builds the

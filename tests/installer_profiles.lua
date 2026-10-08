@@ -53,12 +53,15 @@ assert(not client["/duckserve.lua"], "client unexpectedly installed server")
 local router = runProfile("router", { "", "router", "", "", "", "", "", "" })
 assert(router["/duck-router.lua"], "router runtime was not installed")
 assert(router["/etc/ducknet/config.lua"]:find("forwarding = true", 1, true))
+assert(router["/startup/ducknet-router.lua"], "router startup was not installed")
+assert(load(router["/startup/ducknet-router.lua"], "=router-startup"))
 
 local server = runProfile("server", { "", "server", "", "", "", "", "", "", "1" })
 assert(server["/duckserve.lua"], "server runtime was not installed")
 assert(server["/etc/ducknet/site.lua"]:find("DuckNet Foo Bar Test", 1, true))
+assert(server["/startup/ducknet-server.lua"], "server startup was not installed")
+assert(load(server["/startup/ducknet-server.lua"], "=server-startup"))
 
 _G.fs, _G.http, _G.peripheral = original.fs, original.http, original.peripheral
 io.read, os.pullEvent = original.read, original.pullEvent
 io.write("all installer profile tests passed\n")
-
