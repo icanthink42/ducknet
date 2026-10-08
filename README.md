@@ -24,13 +24,12 @@ networks exercise them.
 Download `install.lua`, run it, then choose a branch and one or more packages:
 
 ```sh
-wget https://YOUR-HOST/YOUR-REPO/main/install.lua /tmp/ducknet-install.lua
-/tmp/ducknet-install.lua
+wget https://raw.githubusercontent.com/icanthink42/ducknet/main/install.lua /tmp/ducknet-install.lua
+/tmp/ducknet-install.lua https://raw.githubusercontent.com/icanthink42/ducknet
 ```
 
-The installer asks for the raw repository URL because this project does not yet
-have a canonical public host. For GitHub it looks like
-`https://raw.githubusercontent.com/OWNER/REPOSITORY` (without a branch).
+The repository URL is supplied to the installer above. It will ask which branch
+and packages to install.
 
 Packages are installed into `/usr/lib`, programs into `/usr/bin`, examples into
 `/usr/share/ducknet`, and configuration into `/etc/ducknet`. Re-running the
