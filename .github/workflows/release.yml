@@ -1,0 +1,32 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Lua
+        run: sudo apt-get update && sudo apt-get install -y lua5.4
+
+      - name: Test
+        run: lua tests/run.lua .
+
+      - name: Build self-contained installer
+        run: python3 scripts/build_release.py "$GITHUB_REF_NAME"
+
+      - name: Validate bundled installer syntax
+        run: luac -p dist/ducknet-installer.lua
+
+      - name: Publish release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/ducknet-installer.lua --generate-notes --verify-tag

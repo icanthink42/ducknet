@@ -22,16 +22,26 @@ networks exercise them.
 
 ## Install
 
-Download `install.lua`, run it, then choose a branch and one or more packages:
+For stable installs, download the self-contained asset from the latest GitHub
+Release, then choose the bundled release and one or more packages:
 
 ```sh
-wget https://raw.githubusercontent.com/icanthink42/ducknet/main/install.lua /tmp/ducknet-install.lua
+wget https://github.com/icanthink42/ducknet/releases/latest/download/ducknet-installer.lua /tmp/ducknet-install.lua
 /tmp/ducknet-install.lua
 ```
 
-The installer uses this repository automatically. It will ask which branch and
-packages to install. Developers can optionally pass a different raw repository
-base URL as the first argument when testing a fork.
+Release installers contain every DuckNet file, so installation does not depend
+on raw-file cache updates. The branch prompt defaults to the bundled version;
+entering a branch name such as `main` deliberately switches to raw development
+files. Developers can optionally pass a different raw repository base URL as
+the first argument when testing a fork.
+
+Releases are built automatically when a semantic version tag is pushed:
+
+```sh
+git tag v0.2.0
+git push origin v0.2.0
+```
 
 On OpenComputers, packages are installed into `/usr/lib` and programs into
 `/usr/bin`. On CC:Tweaked, packages are installed into `/ducknet` and programs

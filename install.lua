@@ -1,5 +1,9 @@
 local isComputerCraft = type(fs) == "table" and type(http) == "table" and
   type(os) == "table" and type(os.pullEvent) == "function"
+-- The release builder replaces these two declarations. Keeping them nil makes
+-- this source installer fetch the selected development branch as before.
+local BUNDLED_FILES = nil
+local BUNDLED_VERSION = nil
 local component, filesystem, internet
 if not isComputerCraft then
   component = require("component")
@@ -66,8 +70,10 @@ local arguments = { ... }
 local base = arguments[1] or DEFAULT_REPOSITORY
 assert(base and base:match("^https?://"), "a http(s) repository URL is required")
 base = base:gsub("/+$", "")
-local branch = ask("Branch", "main")
+local branch = ask(BUNDLED_VERSION and "Branch or bundled release" or "Branch",
+  BUNDLED_VERSION or "main")
 assert(branch:match("^[%w%._/-]+$") and not branch:find("%.%."), "invalid branch")
+local useBundle = BUNDLED_FILES ~= nil and branch == BUNDLED_VERSION
 
 io.write("Packages: core, tcp, dltp, server, tools, niobium, or all\n")
 local selection = ask("Install", "all")
@@ -160,7 +166,8 @@ local function download(source, destination, preserve)
   makeDirectory(parent(destination))
   local url = base .. "/" .. branch .. "/" .. source
   io.write("get  " .. source .. "\n")
-  local body, reason = fetch(url)
+  local body, reason
+  if useBundle then body = BUNDLED_FILES[source] else body, reason = fetch(url) end
   assert(body, reason or ("request failed: " .. url))
   local temporary = destination .. ".ducknet-new"
   writeFile(temporary, body)
@@ -175,4 +182,5 @@ for _, name in ipairs(order) do
   end
 end
 io.write("DuckNet installed for " .. (isComputerCraft and "CC:Tweaked" or "OpenComputers") ..
-  " from branch " .. branch .. ". Edit /etc/ducknet/config.lua next.\n")
+  " from " .. (useBundle and "release " or "branch ") .. branch ..
+  ". Edit /etc/ducknet/config.lua next.\n")
