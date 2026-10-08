@@ -36,3 +36,11 @@ Secure envelopes contain a random IV, ciphertext, and HMAC-SHA-256 tag. Keys are
 derived independently from the configured pre-shared key. The MAC is checked in
 constant time before decryption. Encryption is provided by an OpenComputers data
 card; secure mode fails closed when it is unavailable.
+
+## Platform links
+
+The protocol above the link layer is identical on CC:Tweaked and OpenComputers.
+CC:Tweaked carries a targeted DuckNet envelope over modem channel 4660 by
+default. OpenComputers sends the same encoded IP frame to the configured modem
+component address. Logical addressing, routing, TCP, and DLTP do not depend on
+the platform adapter.

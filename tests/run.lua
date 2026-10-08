@@ -149,4 +149,40 @@ assert(not ok)
 local quotaOk = sandbox:run([[while true do end]])
 assert(not quotaOk)
 
+-- The CC:Tweaked adapter targets logical next hops over a shared modem channel.
+local savedPeripheral = _G.peripheral
+local savedPullEvent, savedStartTimer, savedCancelTimer = os.pullEvent, os.startTimer, os.cancelTimer
+local transmission
+local ccModem = {
+  open = function() end,
+  close = function() end,
+  transmit = function(channel, replyChannel, payload)
+    transmission = { channel, replyChannel, payload }
+  end
+}
+_G.peripheral = {
+  find = function(_, filter)
+    filter("left", ccModem)
+    return ccModem
+  end
+}
+os.startTimer = function() return 7 end
+os.cancelTimer = function() end
+package.loaded["ducknet.modem"] = nil
+local CCLink = require("ducknet.modem")
+local ccLink = CCLink.new(nil, { address = "10.0.0.1", port = 4660 })
+assert(ccLink:send("10.0.0.2", "frame"))
+equal(transmission[1], 4660)
+equal(transmission[3].target, "10.0.0.2")
+os.pullEvent = function()
+  return "modem_message", "left", 4660, 4660,
+    { marker = "ducknet:1", source = "10.0.0.2", target = "10.0.0.1", frame = "reply" }, 4
+end
+local from, frame = ccLink:receive(1)
+equal(from, "10.0.0.2")
+equal(frame, "reply")
+_G.peripheral = savedPeripheral
+os.pullEvent, os.startTimer, os.cancelTimer = savedPullEvent, savedStartTimer, savedCancelTimer
+package.loaded["ducknet.modem"] = nil
+
 io.write("all DuckNet tests passed\n")

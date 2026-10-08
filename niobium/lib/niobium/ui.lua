@@ -6,7 +6,10 @@ function UI.new(gpu, term)
 end
 
 function UI:clear()
-  if self.term and self.term.clear then self.term.clear() end
+  if self.term and self.term.clear then
+    self.term.clear()
+    if self.term.setCursorPos then self.term.setCursorPos(1, 1) end
+  end
 end
 
 function UI:write(value)
@@ -15,6 +18,7 @@ end
 
 function UI:size()
   if self.gpu and self.gpu.getResolution then return self.gpu.getResolution() end
+  if self.term and self.term.getSize then return self.term.getSize() end
   return 80, 25
 end
 
@@ -29,4 +33,3 @@ function UI:capability()
 end
 
 return UI
-

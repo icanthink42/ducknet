@@ -1,4 +1,4 @@
--- Copy this file to /etc/ducknet/config.lua and edit it for this computer.
+-- Edit this file for this computer. It works on CC:Tweaked and OpenComputers.
 return {
   link = {
     port = 4660,
@@ -24,4 +24,3 @@ return {
     -- key = "replace-with-a-long-random-secret"
   }
 }
-

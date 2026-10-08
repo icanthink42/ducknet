@@ -10,8 +10,10 @@ ducknet.Crypto = require("ducknet.crypto")
 
 -- Build a complete stack from a config table and an optional modem component.
 function ducknet.stack(configuration, modem)
-  if not modem then modem = require("component").modem end
-  local link = ducknet.Link.new(modem, configuration.link or {})
+  local linkOptions = {}
+  for key, value in pairs(configuration.link or {}) do linkOptions[key] = value end
+  linkOptions.address = configuration.ip.address
+  local link = ducknet.Link.new(modem, linkOptions)
   local ip = ducknet.IP.new(link, configuration.ip)
   for _, route in ipairs(configuration.routes or {}) do
     ip:addRoute(route.network, route.via, route.metric)

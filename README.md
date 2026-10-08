@@ -1,7 +1,8 @@
 # DuckNet
 
-DuckNet is an application network for OpenComputers. It deliberately keeps the
-layers separate so programs can use only the part they need:
+DuckNet is an application network for CC:Tweaked and OpenComputers. It
+deliberately keeps the layers separate so programs can use only the part they
+need:
 
 ```text
 Niobium application (sandboxed Lua)
@@ -12,7 +13,7 @@ DuckNet TCP (connections, sequence numbers, ACKs, retransmission)
         |
 DuckNet IP (addresses, longest-prefix routes, TTL, hops)
         |
-OpenComputers modem
+CC:Tweaked or OpenComputers modem
 ```
 
 This repository is an initial, working protocol implementation. The APIs and
@@ -31,9 +32,11 @@ wget https://raw.githubusercontent.com/icanthink42/ducknet/main/install.lua /tmp
 The repository URL is supplied to the installer above. It will ask which branch
 and packages to install.
 
-Packages are installed into `/usr/lib`, programs into `/usr/bin`, examples into
-`/usr/share/ducknet`, and configuration into `/etc/ducknet`. Re-running the
-installer upgrades the selected packages. It never replaces an existing config.
+On OpenComputers, packages are installed into `/usr/lib` and programs into
+`/usr/bin`. On CC:Tweaked, packages are installed into `/ducknet` and programs
+at the filesystem root so CraftOS can resolve them. Both platforms use
+`/etc/ducknet/config.lua`. Re-running the installer upgrades selected packages
+and never replaces an existing config.
 
 The optional `tools` package installs commands with a `duck-` prefix so it does
 not replace OpenOS utilities:
@@ -70,9 +73,12 @@ in [`docs/protocol.md`](docs/protocol.md).
 
 ## Security model
 
-Encrypted DLTP requires an OpenComputers data card (or a compatible crypto
-provider) and a pre-shared key. It uses encrypt-then-MAC with independent keys,
-random IVs, and HMAC-SHA-256. Niobium does not expose `component`, `computer`,
+Encrypted DLTP currently requires an OpenComputers data card (or a compatible
+crypto provider) and a pre-shared key. It uses encrypt-then-MAC with independent
+keys, random IVs, and HMAC-SHA-256. Niobium does not expose `component`, `computer`,
 `filesystem`, `io`, `os`, `debug`, or the host `require`. Sites receive explicit
 capabilities instead. This is intentional: unrestricted OpenComputers APIs and a
-meaningful sandbox cannot coexist.
+meaningful sandbox cannot coexist. On CC:Tweaked, Niobium also benefits from
+CraftOS's built-in protection against programs which run too long without
+yielding; platforms exposing `debug.sethook` receive the tighter configured
+instruction quota.

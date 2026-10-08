@@ -8,8 +8,10 @@ local cli = {}
 function cli.load(path, enableICMP)
   local settings, err = config.load(path)
   if not settings then error("could not load DuckNet config: " .. tostring(err), 0) end
-  local component = require("component")
-  local link = Link.new(component.modem, settings.link or {})
+  local linkOptions = {}
+  for key, value in pairs(settings.link or {}) do linkOptions[key] = value end
+  linkOptions.address = settings.ip.address
+  local link = Link.new(nil, linkOptions)
   local ip = IP.new(link, settings.ip)
   for _, route in ipairs(settings.routes or {}) do
     ip:addRoute(route.network, route.via, route.metric)

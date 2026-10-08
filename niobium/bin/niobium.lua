@@ -19,9 +19,15 @@ local response, requestError = stack.dltp:request(host, "GET", path)
 if not response then error("request failed: " .. tostring(requestError), 0) end
 if response.status ~= 200 then error("site returned status " .. tostring(response.status), 0) end
 
-local component = require("component")
-local term = require("term")
-local ui = UI.new(component.isAvailable("gpu") and component.gpu or nil, term)
+local terminal, gpu
+if type(peripheral) == "table" then
+  terminal = term
+else
+  local component = require("component")
+  terminal = require("term")
+  gpu = component.isAvailable("gpu") and component.gpu or nil
+end
+local ui = UI.new(gpu, terminal)
 local origin = host
 local network = {
   request = function(method, requestedPath, options)
@@ -35,4 +41,3 @@ local ok, runtimeError = sandbox:run(response.body, {
   ui = ui:capability(), net = network
 }, "=" .. url)
 if not ok then error("site crashed: " .. tostring(runtimeError), 0) end
-

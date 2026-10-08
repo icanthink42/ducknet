@@ -49,9 +49,10 @@ function Sandbox:run(source, capabilities, chunkName)
     used = used + 1000
     if used > self.instructionLimit then error("site exceeded instruction limit", 0) end
   end
-  debug.sethook(meter, "", 1000)
+  local canMeter = debug and type(debug.sethook) == "function"
+  if canMeter then debug.sethook(meter, "", 1000) end
   local results = { pcall(chunk) }
-  debug.sethook()
+  if canMeter then debug.sethook() end
   if not results[1] then
     if self.onError then self.onError(results[2]) end
     return nil, results[2]
@@ -60,4 +61,3 @@ function Sandbox:run(source, capabilities, chunkName)
 end
 
 return Sandbox
-

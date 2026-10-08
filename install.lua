@@ -1,8 +1,14 @@
-local component = require("component")
-local filesystem = require("filesystem")
-local internet = require("internet")
-
-assert(component.isAvailable("internet"), "an internet card is required")
+local isComputerCraft = type(fs) == "table" and type(http) == "table" and
+  type(os) == "table" and type(os.pullEvent) == "function"
+local component, filesystem, internet
+if not isComputerCraft then
+  component = require("component")
+  filesystem = require("filesystem")
+  internet = require("internet")
+  assert(component.isAvailable("internet"), "an internet card is required")
+else
+  assert(http.get, "CC:Tweaked HTTP access must be enabled")
+end
 
 local packages = {
   core = {
@@ -81,25 +87,83 @@ end
 for name in pairs(selected) do includeDependencies(name) end
 
 local function parent(path) return path:match("^(.*)/[^/]+$") end
+
+local function destinationForPlatform(destination)
+  if not isComputerCraft then return destination end
+  if destination == "/usr/lib/ducknet.lua" then return "/ducknet.lua" end
+  destination = destination:gsub("^/usr/lib/ducknet/", "/ducknet/")
+  destination = destination:gsub("^/usr/lib/niobium/", "/niobium/")
+  destination = destination:gsub("^/usr/bin/", "/")
+  destination = destination:gsub("^/usr/share/ducknet/", "/ducknet/examples/")
+  return destination
+end
+
+local function exists(path)
+  if isComputerCraft then return fs.exists(path) end
+  return filesystem.exists(path)
+end
+
+local function makeDirectory(path)
+  if isComputerCraft then fs.makeDir(path) else filesystem.makeDirectory(path) end
+end
+
+local function remove(path)
+  if isComputerCraft then fs.delete(path) else filesystem.remove(path) end
+end
+
+local function rename(source, destination)
+  if isComputerCraft then fs.move(source, destination) return true end
+  return filesystem.rename(source, destination)
+end
+
+local function fetch(url)
+  if isComputerCraft then
+    local handle, reason, failure = http.get(url, nil, true)
+    if not handle then
+      if failure and failure.close then failure.close() end
+      return nil, reason
+    end
+    local body = handle.readAll()
+    handle.close()
+    return body
+  end
+  local handle, reason = internet.request(url)
+  if not handle then return nil, reason end
+  local chunks = {}
+  local ok, failure = pcall(function()
+    for chunk in handle do chunks[#chunks + 1] = chunk end
+  end)
+  if not ok then return nil, failure end
+  return table.concat(chunks)
+end
+
+local function writeFile(path, body)
+  if isComputerCraft then
+    local file = assert(fs.open(path, "wb"))
+    file.write(body)
+    file.close()
+  else
+    local file = assert(io.open(path, "wb"))
+    file:write(body)
+    file:close()
+  end
+end
+
 local function download(source, destination, preserve)
-  if preserve and filesystem.exists(destination) then
+  destination = destinationForPlatform(destination)
+  if preserve and exists(destination) then
     io.write("keep " .. destination .. "\n")
     return
   end
-  filesystem.makeDirectory(parent(destination))
+  makeDirectory(parent(destination))
   local url = base .. "/" .. branch .. "/" .. source
   io.write("get  " .. source .. "\n")
-  local handle, reason = internet.request(url)
-  assert(handle, reason or ("request failed: " .. url))
+  local body, reason = fetch(url)
+  assert(body, reason or ("request failed: " .. url))
   local temporary = destination .. ".ducknet-new"
-  local file = assert(io.open(temporary, "wb"))
-  local ok, failure = pcall(function()
-    for chunk in handle do file:write(chunk) end
-  end)
-  file:close()
-  if not ok then filesystem.remove(temporary) error(failure, 0) end
-  if filesystem.exists(destination) then filesystem.remove(destination) end
-  assert(filesystem.rename(temporary, destination))
+  writeFile(temporary, body)
+  if exists(destination) then remove(destination) end
+  assert(rename(temporary, destination))
 end
 
 local order = { "core", "tcp", "dltp", "server", "tools", "niobium" }
@@ -108,4 +172,5 @@ for _, name in ipairs(order) do
     for _, file in ipairs(packages[name]) do download(file[1], file[2], file[3]) end
   end
 end
-io.write("DuckNet installed from branch " .. branch .. ". Edit /etc/ducknet/config.lua next.\n")
+io.write("DuckNet installed for " .. (isComputerCraft and "CC:Tweaked" or "OpenComputers") ..
+  " from branch " .. branch .. ". Edit /etc/ducknet/config.lua next.\n")
