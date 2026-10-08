@@ -29,4 +29,4 @@ jobs:
       - name: Publish release asset
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/ducknet-installer.lua --generate-notes --verify-tag
+        run: gh release create "$GITHUB_REF_NAME" dist/ducknet-installer.lua --notes-file .github/release-notes.md --verify-tag
