@@ -53,6 +53,8 @@ local dependencies = {
   server = { "dltp" }, tools = { "dltp" }, niobium = { "dltp" }
 }
 
+local DEFAULT_REPOSITORY = "https://raw.githubusercontent.com/icanthink42/ducknet"
+
 local function ask(prompt, fallback)
   io.write(prompt .. (fallback and " [" .. fallback .. "]" or "") .. ": ")
   local answer = io.read()
@@ -61,7 +63,7 @@ local function ask(prompt, fallback)
 end
 
 local arguments = { ... }
-local base = arguments[1] or ask("Raw repository URL (without branch)")
+local base = arguments[1] or DEFAULT_REPOSITORY
 assert(base and base:match("^https?://"), "a http(s) repository URL is required")
 base = base:gsub("/+$", "")
 local branch = ask("Branch", "main")

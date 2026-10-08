@@ -26,11 +26,12 @@ Download `install.lua`, run it, then choose a branch and one or more packages:
 
 ```sh
 wget https://raw.githubusercontent.com/icanthink42/ducknet/main/install.lua /tmp/ducknet-install.lua
-/tmp/ducknet-install.lua https://raw.githubusercontent.com/icanthink42/ducknet
+/tmp/ducknet-install.lua
 ```
 
-The repository URL is supplied to the installer above. It will ask which branch
-and packages to install.
+The installer uses this repository automatically. It will ask which branch and
+packages to install. Developers can optionally pass a different raw repository
+base URL as the first argument when testing a fork.
 
 On OpenComputers, packages are installed into `/usr/lib` and programs into
 `/usr/bin`. On CC:Tweaked, packages are installed into `/ducknet` and programs
