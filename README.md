@@ -22,22 +22,15 @@ networks exercise them.
 
 ## Install
 
-On CC:Tweaked, run the installer directly so an old downloaded copy cannot be
-reused:
+Download `install.lua`, run it, then choose a branch and one or more packages:
 
 ```sh
-wget run https://raw.githubusercontent.com/icanthink42/ducknet/main/install.lua https://raw.githubusercontent.com/icanthink42/ducknet
-```
-
-On OpenComputers:
-
-```sh
-wget -f https://raw.githubusercontent.com/icanthink42/ducknet/main/install.lua /tmp/ducknet-install.lua
+wget https://raw.githubusercontent.com/icanthink42/ducknet/main/install.lua /tmp/ducknet-install.lua
 /tmp/ducknet-install.lua https://raw.githubusercontent.com/icanthink42/ducknet
 ```
 
-The repository URL is supplied to the installer in both examples. It will ask
-which branch and packages to install.
+The repository URL is supplied to the installer above. It will ask which branch
+and packages to install.
 
 On OpenComputers, packages are installed into `/usr/lib` and programs into
 `/usr/bin`. On CC:Tweaked, packages are installed into `/ducknet` and programs
