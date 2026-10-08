@@ -36,12 +36,10 @@ entering a branch name such as `main` deliberately switches to raw development
 files. Developers can optionally pass a different raw repository base URL as
 the first argument when testing a fork.
 
-Releases are built automatically when a semantic version tag is pushed:
-
-```sh
-git tag v0.2.0
-git push origin v0.2.0
-```
+Every push to `main` is tested and published automatically. The release pipeline
+increments the latest semantic patch version, tags the tested commit, builds the
+self-contained installer, and uploads it as the new latest GitHub Release. For
+example, the push after `v0.1.0` becomes `v0.1.1`.
 
 On OpenComputers, packages are installed into `/usr/lib` and programs into
 `/usr/bin`. On CC:Tweaked, packages are installed into `/ducknet` and programs
