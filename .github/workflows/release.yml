@@ -46,6 +46,9 @@ jobs:
       - name: Validate bundled installer syntax
         run: luac -p dist/ducknet-installer.lua
 
+      - name: Test installer profiles
+        run: lua tests/installer_profiles.lua dist/ducknet-installer.lua
+
       - name: Tag tested commit
         env:
           VERSION: ${{ steps.version.outputs.version }}

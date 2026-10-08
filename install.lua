@@ -34,6 +34,11 @@ local packages = {
   server = {
     { "ducknet/bin/duckserve.lua", "/usr/bin/duckserve.lua" },
     { "examples/server.lua", "/usr/share/ducknet/server.lua" },
+    { "sites/foo-bar.lua", "/usr/share/ducknet/sites/foo-bar.lua" },
+    { "examples/server.lua", "/usr/share/ducknet/sites/hello-world.lua" }
+  },
+  router = {
+    { "ducknet/bin/duckrouter.lua", "/usr/bin/duck-router.lua" },
     { "examples/router.lua", "/usr/share/ducknet/router.lua" }
   },
   tools = {
@@ -54,7 +59,8 @@ local packages = {
 
 local dependencies = {
   core = {}, tcp = { "core" }, dltp = { "core", "tcp" },
-  server = { "dltp" }, tools = { "dltp" }, niobium = { "dltp" }
+  server = { "dltp" }, router = { "core" }, tools = { "dltp" },
+  niobium = { "dltp" }
 }
 
 local DEFAULT_REPOSITORY = "https://raw.githubusercontent.com/icanthink42/ducknet"
@@ -75,16 +81,32 @@ local branch = ask(BUNDLED_VERSION and "Branch or bundled release" or "Branch",
 assert(branch:match("^[%w%._/-]+$") and not branch:find("%.%."), "invalid branch")
 local useBundle = BUNDLED_FILES ~= nil and branch == BUNDLED_VERSION
 
-io.write("Packages: core, tcp, dltp, server, tools, niobium, or all\n")
-local selection = ask("Install", "all")
 local selected = {}
-if selection == "all" then
-  for name in pairs(packages) do selected[name] = true end
-else
-  for name in selection:gmatch("[%w_-]+") do
-    assert(packages[name], "unknown package: " .. name)
-    selected[name] = true
+io.write("Profiles: client, router, server, developer, custom\n")
+local profile = ask("Profile", "client"):lower()
+local profiles = {
+  client = { "niobium", "tools" },
+  router = { "router", "tools" },
+  server = { "server", "tools" },
+  developer = { "core", "tcp", "dltp", "server", "router", "tools", "niobium" }
+}
+assert(profiles[profile] or profile == "custom", "unknown profile: " .. profile)
+if profile == "custom" then
+  io.write("Packages: core, tcp, dltp, server, router, tools, niobium, or all\n")
+  local selection = ask("Install", "all")
+  if selection == "all" then
+    for name in pairs(packages) do selected[name] = true end
+  else
+    for name in selection:gmatch("[%w_-]+") do
+      assert(packages[name], "unknown package: " .. name)
+      selected[name] = true
+    end
   end
+else
+  for _, name in ipairs(profiles[profile]) do selected[name] = true end
+end
+if profile == "developer" then
+  for name in pairs(packages) do selected[name] = true end
 end
 
 local function includeDependencies(name)
@@ -157,6 +179,27 @@ local function writeFile(path, body)
   end
 end
 
+local function readFile(path)
+  if isComputerCraft then
+    local file = assert(fs.open(path, "rb"))
+    local body = file.readAll()
+    file.close()
+    return body
+  end
+  local file = assert(io.open(path, "rb"))
+  local body = file:read("*a")
+  file:close()
+  return body
+end
+
+local function writeAtomic(path, body)
+  makeDirectory(parent(path))
+  local temporary = path .. ".ducknet-new"
+  writeFile(temporary, body)
+  if exists(path) then remove(path) end
+  assert(rename(temporary, path))
+end
+
 local function download(source, destination, preserve)
   destination = destinationForPlatform(destination)
   if preserve and exists(destination) then
@@ -175,12 +218,151 @@ local function download(source, destination, preserve)
   assert(rename(temporary, destination))
 end
 
-local order = { "core", "tcp", "dltp", "server", "tools", "niobium" }
+local configPath = "/etc/ducknet/config.lua"
+local hadConfig = exists(configPath)
+local order = { "core", "tcp", "dltp", "server", "router", "tools", "niobium" }
 for _, name in ipairs(order) do
   if selected[name] then
     for _, file in ipairs(packages[name]) do download(file[1], file[2], file[3]) end
   end
 end
-io.write("DuckNet installed for " .. (isComputerCraft and "CC:Tweaked" or "OpenComputers") ..
-  " from " .. (useBundle and "release " or "branch ") .. branch ..
-  ". Edit /etc/ducknet/config.lua next.\n")
+
+local function yes(prompt, fallback)
+  local marker = fallback and "Y/n" or "y/N"
+  local answer = ask(prompt .. " (" .. marker .. ")", fallback and "y" or "n")
+  return answer:lower():sub(1, 1) == "y"
+end
+
+local function number(prompt, fallback, minimum, maximum)
+  local value = tonumber(ask(prompt, tostring(fallback)))
+  assert(value and value % 1 == 0 and value >= minimum and value <= maximum,
+    prompt .. " must be between " .. minimum .. " and " .. maximum)
+  return value
+end
+
+local function quote(value)
+  return string.format("%q", value)
+end
+
+local function configureNetwork(role)
+  if hadConfig and not yes("Replace the existing DuckNet configuration", false) then
+    io.write("keep " .. configPath .. "\n")
+    return
+  end
+  io.write("\nConfigure the " .. role .. "\n")
+  local defaultHost = 2
+  if role == "router" then defaultHost = 1
+  elseif role == "server" then defaultHost = 10
+  elseif isComputerCraft and os.getComputerID then defaultHost = os.getComputerID() % 240 + 11 end
+  local address = ask("DuckNet IP address", "10.0.0." .. defaultHost)
+  local channel = number("Modem channel", 4660, 0, 65535)
+  local ttl = number("Default TTL", 16, 1, 255)
+  local directNetwork = ask("Directly connected network", "10.0.0.0/24")
+  local dltpPort = number("DLTP port", role == "server" and 80 or 80, 1, 65535)
+  local routes = { { network = directNetwork, metric = 10 } }
+
+  if role ~= "router" then
+    local gateway = ask("Default gateway (blank for none)", "")
+    if gateway ~= "" then
+      routes[#routes + 1] = { network = "0.0.0.0/0", via = gateway, metric = 100 }
+    end
+  else
+    while yes("Add another route", false) do
+      routes[#routes + 1] = {
+        network = ask("Destination network (CIDR)"),
+        via = ask("Next-hop DuckNet IP"),
+        metric = number("Metric", 100, 0, 65535)
+      }
+    end
+  end
+
+  local peers = {}
+  if not isComputerCraft then
+    io.write("OpenComputers requires logical neighbor to modem-address mappings.\n")
+    while yes("Add a modem neighbor", #peers == 0) do
+      peers[#peers + 1] = {
+        address = ask("Neighbor DuckNet IP"),
+        modem = ask("Neighbor modem component address")
+      }
+    end
+  end
+
+  local lines = {
+    "-- Generated by the DuckNet " .. role .. " profile.",
+    "return {",
+    "  link = {",
+    "    port = " .. channel .. ",",
+    "    broadcastUnknown = false,",
+    "    peers = {"
+  }
+  for _, peer in ipairs(peers) do
+    lines[#lines + 1] = "      [" .. quote(peer.address) .. "] = " .. quote(peer.modem) .. ","
+  end
+  lines[#lines + 1] = "    }"
+  lines[#lines + 1] = "  },"
+  lines[#lines + 1] = "  ip = { address = " .. quote(address) ..
+    ", forwarding = " .. tostring(role == "router") .. ", ttl = " .. ttl .. " },"
+  lines[#lines + 1] = "  routes = {"
+  for _, route in ipairs(routes) do
+    local via = route.via and (", via = " .. quote(route.via)) or ""
+    lines[#lines + 1] = "    { network = " .. quote(route.network) .. via ..
+      ", metric = " .. route.metric .. " },"
+  end
+  lines[#lines + 1] = "  },"
+  lines[#lines + 1] = "  tcp = { mtu = 4096, timeout = 2, retries = 4 },"
+  lines[#lines + 1] = "  dltp = { port = " .. dltpPort .. " }"
+  lines[#lines + 1] = "}"
+  writeAtomic(configPath, table.concat(lines, "\n") .. "\n")
+  io.write("configured " .. configPath .. "\n")
+end
+
+local function githubRawUrl(url)
+  local owner, repository, ref, path = url:match(
+    "^https://github%.com/([^/]+)/([^/]+)/blob/([^/]+)/(.+)$")
+  if owner then
+    return "https://raw.githubusercontent.com/" .. owner .. "/" .. repository ..
+      "/" .. ref .. "/" .. path:gsub("%?.*$", "")
+  end
+  return url
+end
+
+local function configureSite()
+  io.write("\nWebsites:\n")
+  io.write("  1. Foo Bar network test\n")
+  io.write("  2. Hello World\n")
+  io.write("  3. GitHub URL\n")
+  local choice = ask("Website", "1")
+  local body
+  if choice == "1" or choice:lower() == "foo-bar" then
+    body = readFile(destinationForPlatform("/usr/share/ducknet/sites/foo-bar.lua"))
+  elseif choice == "2" or choice:lower() == "hello-world" then
+    body = readFile(destinationForPlatform("/usr/share/ducknet/sites/hello-world.lua"))
+  elseif choice == "3" or choice:lower() == "github" then
+    local url = githubRawUrl(ask("GitHub raw or blob URL"))
+    assert(url:match("^https://"), "website URL must use HTTPS")
+    local reason
+    body, reason = fetch(url)
+    assert(body, reason or "could not download website")
+  else
+    error("unknown website selection: " .. choice, 0)
+  end
+  local chunk, syntaxError = load(body, "=ducknet-site")
+  assert(chunk, "website is not valid Lua: " .. tostring(syntaxError))
+  writeAtomic("/etc/ducknet/site.lua", body)
+  io.write("activated /etc/ducknet/site.lua\n")
+end
+
+if profile == "client" or profile == "router" or profile == "server" then
+  configureNetwork(profile)
+end
+if profile == "server" then configureSite() end
+
+io.write("\nDuckNet installed for " .. (isComputerCraft and "CC:Tweaked" or "OpenComputers") ..
+  " from " .. (useBundle and "release " or "branch ") .. branch .. ".\n")
+if profile == "router" then
+  io.write("Start routing with: duck-router\n")
+elseif profile == "server" then
+  io.write("Start the server with: duckserve /etc/ducknet/site.lua\n")
+elseif profile == "client" then
+  io.write("Open a site with: niobium dltp://<server-ip>/\n")
+end

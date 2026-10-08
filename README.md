@@ -36,6 +36,20 @@ entering a branch name such as `main` deliberately switches to raw development
 files. Developers can optionally pass a different raw repository base URL as
 the first argument when testing a fork.
 
+The installer provides these profiles:
+
+- `client`: Niobium, DLTP, TCP/IP, and diagnostic tools
+- `router`: packet forwarding, route configuration, and diagnostic tools
+- `server`: the DLTP server runtime, network configuration, and website setup
+- `developer`: every library, program, example, and bundled website
+- `custom`: manual package selection
+
+Client, router, and server profiles guide you through network configuration.
+The server profile can activate the bundled Foo Bar test or Hello World site,
+or download a DuckNet server application from a GitHub raw/blob URL. Start a
+configured server with `duckserve /etc/ducknet/site.lua`, or a router with
+`duck-router`.
+
 Every push to `main` is tested and published automatically. The release pipeline
 increments the latest semantic patch version, tags the tested commit, builds the
 self-contained installer, and uploads it as the new latest GitHub Release. For
