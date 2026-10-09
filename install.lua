@@ -285,6 +285,16 @@ local function quote(value)
   return string.format("%q", value)
 end
 
+local function defaultSubnet(address)
+  local first, second, third, fourth =
+    address:match("^(%d+)%.(%d+)%.(%d+)%.(%d+)$")
+  if first and tonumber(first) <= 255 and tonumber(second) <= 255 and
+      tonumber(third) <= 255 and tonumber(fourth) <= 255 then
+    return first .. "." .. second .. "." .. third .. ".0/24"
+  end
+  return "10.0.0.0/24"
+end
+
 local function configureNetwork(role)
   if hadConfig and not yes("Replace the existing DuckNet configuration", false) then
     io.write("keep " .. configPath .. "\n")
@@ -298,7 +308,7 @@ local function configureNetwork(role)
   local address = ask("DuckNet IP address", "10.0.0." .. defaultHost)
   local channel = number("Modem channel", 4660, 0, 65535)
   local ttl = number("Default TTL", 16, 1, 255)
-  local subnet = ask("Subnet", "10.0.0.0/24")
+  local subnet = ask("Subnet", defaultSubnet(address))
   local dltpPort = number("DLTP port", role == "server" and 80 or 80, 1, 65535)
   local routes = { { network = subnet, metric = 10 } }
 
