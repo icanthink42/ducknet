@@ -2,7 +2,7 @@ local installerPath = (...) or "dist/ducknet-installer.lua"
 
 local original = {
   fs = _G.fs, http = _G.http, peripheral = _G.peripheral,
-  read = io.read, pullEvent = os.pullEvent
+  shell = _G.shell, read = io.read, pullEvent = os.pullEvent
 }
 
 local function runProfile(profile, answers)
@@ -32,6 +32,11 @@ local function runProfile(profile, answers)
       return nil, "unexpected HTTP request"
     end
   }
+  local shellPath = ".:/rom/programs"
+  _G.shell = {
+    path = function() return shellPath end,
+    setPath = function(value) shellPath = value end
+  }
   os.pullEvent = function() end
   io.read = function()
     local answer = table.remove(answers, 1)
@@ -43,29 +48,34 @@ local function runProfile(profile, answers)
   assert(#answers == 0, "installer did not ask every expected question for " .. profile)
   assert(requests == 0, "bundled " .. profile .. " install made an HTTP request")
   assert(files["/etc/ducknet/config.lua"], profile .. " did not write a config")
+  assert(files["/startup/00-ducknet-path.lua"], profile .. " did not install path setup")
+  assert(shellPath:find("/ducknet/bin", 1, true), profile .. " did not update the current path")
   return files
 end
 
 local client = runProfile("client", { "", "client", "", "", "", "", "", "" })
-assert(client["/niobium.lua"], "client did not install Niobium")
-assert(client["/ping.lua"], "client did not install normal command names")
+assert(client["/ducknet/bin/niobium.lua"], "client did not install Niobium")
+assert(client["/ducknet/bin/ping.lua"], "client did not install normal command names")
+assert(client["/ducknet/bin/ping.lua"]:find("/ducknet/lib/?.lua", 1, true),
+  "CC command did not receive the DuckNet library path")
 assert(not client["/duck-ping.lua"], "client retained a legacy command name")
-assert(not client["/serve.lua"], "client unexpectedly installed server")
+assert(not client["/ducknet/bin/serve.lua"], "client unexpectedly installed server")
 
 local router = runProfile("router", { "", "router", "", "", "", "", "", "" })
-assert(router["/router.lua"], "router runtime was not installed")
+assert(router["/ducknet/bin/router.lua"], "router runtime was not installed")
 assert(router["/etc/ducknet/config.lua"]:find("forwarding = true", 1, true))
 assert(router["/startup/ducknet-router.lua"], "router startup was not installed")
 assert(load(router["/startup/ducknet-router.lua"], "=router-startup"))
-assert(router["/startup/ducknet-router.lua"]:find("/router.lua", 1, true))
+assert(router["/startup/ducknet-router.lua"]:find("/ducknet/bin/router.lua", 1, true))
 
 local server = runProfile("server", { "", "server", "", "", "", "", "", "", "1" })
-assert(server["/serve.lua"], "server runtime was not installed")
+assert(server["/ducknet/bin/serve.lua"], "server runtime was not installed")
 assert(server["/etc/ducknet/site.lua"]:find("DuckNet Foo Bar Test", 1, true))
 assert(server["/startup/ducknet-server.lua"], "server startup was not installed")
 assert(load(server["/startup/ducknet-server.lua"], "=server-startup"))
-assert(server["/startup/ducknet-server.lua"]:find("/serve.lua", 1, true))
+assert(server["/startup/ducknet-server.lua"]:find("/ducknet/bin/serve.lua", 1, true))
 
-_G.fs, _G.http, _G.peripheral = original.fs, original.http, original.peripheral
+_G.fs, _G.http, _G.peripheral, _G.shell = original.fs, original.http,
+  original.peripheral, original.shell
 io.read, os.pullEvent = original.read, original.pullEvent
 io.write("all installer profile tests passed\n")

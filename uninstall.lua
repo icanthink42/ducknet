@@ -44,7 +44,7 @@ local common = isComputerCraft and {
   "/duck-ipconfig.lua", "/duck-route.lua", "/duck-neighbors.lua",
   "/duck-ping.lua", "/duck-traceroute.lua", "/duck-router.lua",
   "/duckserve.lua", "/startup/ducknet-router.lua",
-  "/startup/ducknet-server.lua"
+  "/startup/ducknet-server.lua", "/startup/00-ducknet-path.lua"
 } or {
   "/usr/lib/ducknet.lua", "/usr/lib/ducknet", "/usr/lib/niobium",
   "/usr/share/ducknet", "/usr/bin/ipconfig.lua", "/usr/bin/route.lua",
@@ -65,9 +65,16 @@ for _, path in ipairs(common) do
   end
 end
 
+if isComputerCraft and shell and shell.path and shell.setPath then
+  local kept = {}
+  for entry in shell.path():gmatch("[^:]+") do
+    if entry ~= "/ducknet/bin" then kept[#kept + 1] = entry end
+  end
+  shell.setPath(table.concat(kept, ":"))
+end
+
 if exists("/etc/ducknet") and askYes("Remove DuckNet configuration and active website") then
   removeTree("/etc/ducknet")
 end
 
 io.write("DuckNet has been uninstalled.\n")
-

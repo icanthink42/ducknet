@@ -57,9 +57,10 @@ increments the latest semantic patch version, tags the tested commit, builds the
 self-contained installer, and uploads it as the new latest GitHub Release. For
 example, the push after `v0.1.0` becomes `v0.1.1`.
 
-On OpenComputers, packages are installed into `/usr/lib` and programs into
-`/usr/bin`. On CC:Tweaked, packages are installed into `/ducknet` and programs
-at the filesystem root so CraftOS can resolve them. Both platforms use
+On OpenComputers, packages use the normal `/usr/lib`, `/usr/bin`, and
+`/usr/share/ducknet` directories. CC:Tweaked keeps everything organized under
+`/ducknet/lib`, `/ducknet/bin`, and `/ducknet/share`; an early startup entry adds
+`/ducknet/bin` to CraftOS's command path. Both platforms use
 `/etc/ducknet/config.lua`. Re-running the installer upgrades selected packages
 and never replaces an existing config.
 

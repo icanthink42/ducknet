@@ -121,11 +121,11 @@ local function parent(path) return path:match("^(.*)/[^/]+$") end
 
 local function destinationForPlatform(destination)
   if not isComputerCraft then return destination end
-  if destination == "/usr/lib/ducknet.lua" then return "/ducknet.lua" end
-  destination = destination:gsub("^/usr/lib/ducknet/", "/ducknet/")
-  destination = destination:gsub("^/usr/lib/niobium/", "/niobium/")
-  destination = destination:gsub("^/usr/bin/", "/")
-  destination = destination:gsub("^/usr/share/ducknet/", "/ducknet/examples/")
+  if destination == "/usr/lib/ducknet.lua" then return "/ducknet/lib/ducknet.lua" end
+  destination = destination:gsub("^/usr/lib/ducknet/", "/ducknet/lib/ducknet/")
+  destination = destination:gsub("^/usr/lib/niobium/", "/ducknet/lib/niobium/")
+  destination = destination:gsub("^/usr/bin/", "/ducknet/bin/")
+  destination = destination:gsub("^/usr/share/ducknet/", "/ducknet/share/")
   return destination
 end
 
@@ -213,6 +213,9 @@ local function download(source, destination, preserve)
   local body, reason
   if useBundle then body = BUNDLED_FILES[source] else body, reason = fetch(url) end
   assert(body, reason or ("request failed: " .. url))
+  if isComputerCraft and destination:match("^/ducknet/bin/") then
+    body = "package.path = \"/ducknet/lib/?.lua;/ducknet/lib/?/init.lua;\" .. package.path\n" .. body
+  end
   local temporary = destination .. ".ducknet-new"
   writeFile(temporary, body)
   if exists(destination) then remove(destination) end
@@ -221,6 +224,9 @@ end
 
 local function removeLegacyCommands()
   local paths = isComputerCraft and {
+    "/ipconfig.lua", "/route.lua", "/arp.lua", "/ping.lua",
+    "/traceroute.lua", "/dltp.lua", "/router.lua", "/serve.lua",
+    "/niobium.lua", "/uninstall-ducknet.lua", "/ducknet.lua", "/niobium",
     "/duck-ipconfig.lua", "/duck-route.lua", "/duck-neighbors.lua",
     "/duck-ping.lua", "/duck-traceroute.lua", "/duck-router.lua",
     "/duckserve.lua"
@@ -235,6 +241,21 @@ local function removeLegacyCommands()
   end
 end
 
+local function configureCommandPath()
+  if not isComputerCraft then return end
+  local bin = "/ducknet/bin"
+  local function add(path)
+    if path:find(bin, 1, true) then return path end
+    return path .. ":" .. bin
+  end
+  shell.setPath(add(shell.path()))
+  local body = [[local bin = "/ducknet/bin"
+local path = shell.path()
+if not path:find(bin, 1, true) then shell.setPath(path .. ":" .. bin) end
+]]
+  writeAtomic("/startup/00-ducknet-path.lua", body)
+end
+
 local configPath = "/etc/ducknet/config.lua"
 local hadConfig = exists(configPath)
 local order = { "core", "tcp", "dltp", "server", "router", "tools", "niobium" }
@@ -244,6 +265,7 @@ for _, name in ipairs(order) do
   end
 end
 removeLegacyCommands()
+configureCommandPath()
 
 local function yes(prompt, fallback)
   local marker = fallback and "Y/n" or "y/N"
@@ -377,7 +399,8 @@ local function configureStartup(role)
     local opposite = role == "router" and "/startup/ducknet-server.lua" or
       "/startup/ducknet-router.lua"
     if exists(opposite) then remove(opposite) end
-    local program = role == "router" and "/router.lua" or "/serve.lua"
+    local program = role == "router" and "/ducknet/bin/router.lua" or
+      "/ducknet/bin/serve.lua"
     local arguments = role == "server" and (", " .. quote("/etc/ducknet/site.lua")) or ""
     local body = "print(" .. quote("Starting DuckNet " .. role .. "...") .. ")\n" ..
       "local ok = shell.run(" .. quote(program) .. arguments .. ")\n" ..
