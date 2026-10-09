@@ -3,7 +3,7 @@ local cli = require("ducknet.cli")
 local arguments = { ... }
 local destination = arguments[1]
 if not destination then
-  io.stderr:write("usage: duck-traceroute <ip> [max-hops] [timeout] [config.lua]\n")
+  io.stderr:write("usage: traceroute <ip> [max-hops] [timeout] [config.lua]\n")
   return
 end
 local maximum = arguments[2] and cli.number(arguments[2], "max hops", 1, 64) or 16
@@ -21,4 +21,3 @@ for ttl = 1, maximum do
     if result.kind == "reply" then break end
   end
 end
-

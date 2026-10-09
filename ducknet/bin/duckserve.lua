@@ -4,7 +4,7 @@ local ducknet = require("ducknet")
 local arguments = { ... }
 local appPath = arguments[1]
 if not appPath then
-  io.stderr:write("usage: duckserve <application.lua> [config.lua]\n")
+  io.stderr:write("usage: serve <application.lua> [config.lua]\n")
   return
 end
 
@@ -21,4 +21,3 @@ local server = stack.dltp:server()
 configure(server)
 io.write("DuckNet server listening on " .. settings.ip.address .. ":" .. stack.dltp.port .. "\n")
 server:run()
-

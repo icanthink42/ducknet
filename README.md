@@ -47,8 +47,8 @@ The installer provides these profiles:
 Client, router, and server profiles guide you through network configuration.
 The server profile can activate the bundled Foo Bar test or Hello World site,
 or download a DuckNet server application from a GitHub raw/blob URL. Start a
-configured server with `duckserve /etc/ducknet/site.lua`, or a router with
-`duck-router`. Router and server profiles also install and enable the matching
+configured server with `serve /etc/ducknet/site.lua`, or a router with
+`router`. Router and server profiles also install and enable the matching
 startup service automatically. Rebooting the computer resumes its configured
 role without another command.
 
@@ -63,17 +63,22 @@ at the filesystem root so CraftOS can resolve them. Both platforms use
 `/etc/ducknet/config.lua`. Re-running the installer upgrades selected packages
 and never replaces an existing config.
 
-The optional `tools` package installs commands with a `duck-` prefix so it does
-not replace OpenOS utilities:
+The optional `tools` package installs familiar networking commands:
 
 ```text
-duck-ipconfig [config]                 adapter information
-duck-route [destination] [config]      routing table or route lookup
-duck-neighbors [config]                logical IP to modem mappings
-duck-ping <ip> [count] [timeout]       ICMP reachability and latency
-duck-traceroute <ip> [hops] [timeout]  per-router path discovery
+ipconfig [config]                      adapter information
+route [destination] [config]           routing table or route lookup
+arp [config]                           logical IP to modem mappings
+ping <ip> [count] [timeout]            ICMP reachability and latency
+traceroute <ip> [hops] [timeout]       per-router path discovery
 dltp <method> <ip> <path> [body]       DLTP request client
+router                                 run the configured router
+serve <site.lua>                       run a configured DLTP website
+uninstall-ducknet                      remove DuckNet
 ```
+
+The uninstaller removes libraries, programs, and startup services, then asks
+separately before deleting `/etc/ducknet` configuration and website data.
 
 ## Minimal router
 

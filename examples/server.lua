@@ -1,4 +1,4 @@
--- Run with: duckserve /usr/share/ducknet/server.lua
+-- Run with: serve /usr/share/ducknet/server.lua
 return function(app)
   app:use(function(request)
     io.write(request.method .. " " .. request.path .. "\n")
@@ -21,4 +21,3 @@ ui.write("This Lua came from a DLTP server and is running in Niobium.")
     return { status = 200, headers = {}, body = "Hello, " .. request.params.name }
   end)
 end
-

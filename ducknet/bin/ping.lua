@@ -3,7 +3,7 @@ local cli = require("ducknet.cli")
 local arguments = { ... }
 local destination = arguments[1]
 if not destination then
-  io.stderr:write("usage: duck-ping <ip> [count] [timeout] [config.lua]\n")
+  io.stderr:write("usage: ping <ip> [count] [timeout] [config.lua]\n")
   return
 end
 local count = arguments[2] and cli.number(arguments[2], "count", 1, 1000) or 4
@@ -32,4 +32,3 @@ local lost = count - received
 io.write(string.format("%d sent, %d received, %.0f%% loss", count, received, lost / count * 100))
 if received > 0 then io.write(string.format(", average %.1fms", total / received)) end
 io.write("\n")
-

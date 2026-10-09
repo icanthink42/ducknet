@@ -22,7 +22,10 @@ def lua_long_string(value: str) -> str:
 def main() -> None:
     version = sys.argv[1] if len(sys.argv) > 1 else "development"
     source = INSTALLER.read_text(encoding="utf-8")
-    paths = sorted(set(re.findall(r'{\s*"([^"\n]+\.lua)"\s*,', source)))
+    paths = sorted({
+        path for path in re.findall(r'{\s*"([^"\n]+\.lua)"\s*,', source)
+        if not path.startswith("/")
+    })
     if not paths:
         raise SystemExit("installer manifest contains no Lua files")
 

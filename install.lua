@@ -21,7 +21,8 @@ local packages = {
     { "ducknet/lib/ducknet/ip.lua", "/usr/lib/ducknet/ip.lua" },
     { "ducknet/lib/ducknet/icmp.lua", "/usr/lib/ducknet/icmp.lua" },
     { "ducknet/lib/ducknet/config.lua", "/usr/lib/ducknet/config.lua" },
-    { "ducknet/etc/ducknet/config.lua", "/etc/ducknet/config.lua", true }
+    { "ducknet/etc/ducknet/config.lua", "/etc/ducknet/config.lua", true },
+    { "uninstall.lua", "/usr/bin/uninstall-ducknet.lua" }
   },
   tcp = {
     { "ducknet/lib/ducknet/tcp.lua", "/usr/lib/ducknet/tcp.lua" }
@@ -32,22 +33,22 @@ local packages = {
     { "ducknet/lib/ducknet/init.lua", "/usr/lib/ducknet.lua" }
   },
   server = {
-    { "ducknet/bin/duckserve.lua", "/usr/bin/duckserve.lua" },
+    { "ducknet/bin/duckserve.lua", "/usr/bin/serve.lua" },
     { "examples/server.lua", "/usr/share/ducknet/server.lua" },
     { "sites/foo-bar.lua", "/usr/share/ducknet/sites/foo-bar.lua" },
     { "examples/server.lua", "/usr/share/ducknet/sites/hello-world.lua" }
   },
   router = {
-    { "ducknet/bin/duckrouter.lua", "/usr/bin/duck-router.lua" },
+    { "ducknet/bin/duckrouter.lua", "/usr/bin/router.lua" },
     { "examples/router.lua", "/usr/share/ducknet/router.lua" }
   },
   tools = {
     { "ducknet/lib/ducknet/cli.lua", "/usr/lib/ducknet/cli.lua" },
-    { "ducknet/bin/ipconfig.lua", "/usr/bin/duck-ipconfig.lua" },
-    { "ducknet/bin/route.lua", "/usr/bin/duck-route.lua" },
-    { "ducknet/bin/neighbors.lua", "/usr/bin/duck-neighbors.lua" },
-    { "ducknet/bin/ping.lua", "/usr/bin/duck-ping.lua" },
-    { "ducknet/bin/traceroute.lua", "/usr/bin/duck-traceroute.lua" },
+    { "ducknet/bin/ipconfig.lua", "/usr/bin/ipconfig.lua" },
+    { "ducknet/bin/route.lua", "/usr/bin/route.lua" },
+    { "ducknet/bin/neighbors.lua", "/usr/bin/arp.lua" },
+    { "ducknet/bin/ping.lua", "/usr/bin/ping.lua" },
+    { "ducknet/bin/traceroute.lua", "/usr/bin/traceroute.lua" },
     { "ducknet/bin/dltp.lua", "/usr/bin/dltp.lua" }
   },
   niobium = {
@@ -218,6 +219,22 @@ local function download(source, destination, preserve)
   assert(rename(temporary, destination))
 end
 
+local function removeLegacyCommands()
+  local paths = isComputerCraft and {
+    "/duck-ipconfig.lua", "/duck-route.lua", "/duck-neighbors.lua",
+    "/duck-ping.lua", "/duck-traceroute.lua", "/duck-router.lua",
+    "/duckserve.lua"
+  } or {
+    "/usr/bin/duck-ipconfig.lua", "/usr/bin/duck-route.lua",
+    "/usr/bin/duck-neighbors.lua", "/usr/bin/duck-ping.lua",
+    "/usr/bin/duck-traceroute.lua", "/usr/bin/duck-router.lua",
+    "/usr/bin/duckserve.lua"
+  }
+  for _, path in ipairs(paths) do
+    if exists(path) then remove(path) end
+  end
+end
+
 local configPath = "/etc/ducknet/config.lua"
 local hadConfig = exists(configPath)
 local order = { "core", "tcp", "dltp", "server", "router", "tools", "niobium" }
@@ -226,6 +243,7 @@ for _, name in ipairs(order) do
     for _, file in ipairs(packages[name]) do download(file[1], file[2], file[3]) end
   end
 end
+removeLegacyCommands()
 
 local function yes(prompt, fallback)
   local marker = fallback and "Y/n" or "y/N"
@@ -359,7 +377,7 @@ local function configureStartup(role)
     local opposite = role == "router" and "/startup/ducknet-server.lua" or
       "/startup/ducknet-router.lua"
     if exists(opposite) then remove(opposite) end
-    local program = role == "router" and "/duck-router.lua" or "/duckserve.lua"
+    local program = role == "router" and "/router.lua" or "/serve.lua"
     local arguments = role == "server" and (", " .. quote("/etc/ducknet/site.lua")) or ""
     local body = "print(" .. quote("Starting DuckNet " .. role .. "...") .. ")\n" ..
       "local ok = shell.run(" .. quote(program) .. arguments .. ")\n" ..
@@ -374,8 +392,8 @@ local function configureStartup(role)
       pcall(shell.execute, "rc " .. opposite .. " disable")
       remove(oppositePath)
     end
-    local program = role == "router" and "/usr/bin/duck-router.lua" or
-      "/usr/bin/duckserve.lua"
+    local program = role == "router" and "/usr/bin/router.lua" or
+      "/usr/bin/serve.lua"
     local argument = role == "server" and "/etc/ducknet/site.lua" or nil
     local lines = {
       "local worker",
@@ -414,9 +432,9 @@ if profile == "router" or profile == "server" then configureStartup(profile) end
 io.write("\nDuckNet installed for " .. (isComputerCraft and "CC:Tweaked" or "OpenComputers") ..
   " from " .. (useBundle and "release " or "branch ") .. branch .. ".\n")
 if profile == "router" then
-  io.write("Start routing with: duck-router\n")
+  io.write("Start routing with: router\n")
 elseif profile == "server" then
-  io.write("Start the server with: duckserve /etc/ducknet/site.lua\n")
+  io.write("Start the server with: serve /etc/ducknet/site.lua\n")
 elseif profile == "client" then
   io.write("Open a site with: niobium dltp://<server-ip>/\n")
 end

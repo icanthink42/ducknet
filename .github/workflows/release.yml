@@ -41,13 +41,17 @@ jobs:
         run: lua tests/run.lua .
 
       - name: Build self-contained installer
-        run: python3 scripts/build_release.py "${{ steps.version.outputs.version }}"
+        run: |
+          python3 scripts/build_release.py "${{ steps.version.outputs.version }}"
+          cp uninstall.lua dist/ducknet-uninstall.lua
 
-      - name: Validate bundled installer syntax
-        run: luac -p dist/ducknet-installer.lua
+      - name: Validate release scripts
+        run: luac -p dist/ducknet-installer.lua dist/ducknet-uninstall.lua
 
       - name: Test installer profiles
-        run: lua tests/installer_profiles.lua dist/ducknet-installer.lua
+        run: |
+          lua tests/installer_profiles.lua dist/ducknet-installer.lua
+          lua tests/uninstaller.lua uninstall.lua
 
       - name: Tag tested commit
         env:
@@ -62,4 +66,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}
-        run: gh release create "$VERSION" dist/ducknet-installer.lua --notes-file .github/release-notes.md --verify-tag
+        run: gh release create "$VERSION" dist/ducknet-installer.lua dist/ducknet-uninstall.lua --notes-file .github/release-notes.md --verify-tag

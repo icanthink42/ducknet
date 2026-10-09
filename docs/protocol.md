@@ -15,7 +15,7 @@ to `hops`. Routes use longest-prefix match and then the lowest metric. IP protoc
 IP protocol `1` carries diagnostic control messages. Version 1 defines echo
 request, echo reply, and TTL-exceeded messages. Attaching `ducknet.icmp` to an IP
 instance makes a host answer echo requests and makes routers report packets whose
-TTL reaches zero. These messages power `duck-ping` and `duck-traceroute`.
+TTL reaches zero. These messages power `ping` and `traceroute`.
 
 ## TCP
 
