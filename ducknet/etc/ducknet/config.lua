@@ -20,7 +20,5 @@ return {
   tcp = { mtu = 4096, timeout = 2, retries = 4 },
   dltp = {
     port = 80
-    -- For encrypted DLTP, set port = 443 and key to a secret of 16+ bytes.
-    -- key = "replace-with-a-long-random-secret"
   }
 }

@@ -30,12 +30,9 @@ the low-bandwidth OpenComputers modem bus.
 
 DLTP carries one codec-encoded request and response per TCP connection. Requests
 have `method`, `path`, `headers`, and `body`; responses have `status`, `headers`,
-and `body`. Port 80 is conventional for plaintext and 443 for encrypted DLTP.
-
-Secure envelopes contain a random IV, ciphertext, and HMAC-SHA-256 tag. Keys are
-derived independently from the configured pre-shared key. The MAC is checked in
-constant time before decryption. Encryption is provided by an OpenComputers data
-card; secure mode fails closed when it is unavailable.
+and `body`. DLTP currently uses port 80 and provides no encryption. A future
+protocol version will introduce encryption together with naming and authenticated
+site identity.
 
 ## Platform links
 

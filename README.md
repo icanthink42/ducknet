@@ -7,7 +7,7 @@ need:
 ```text
 Niobium application (sandboxed Lua)
         |
-DLTP request/response + authenticated encryption
+DLTP request/response
         |
 DuckNet TCP (connections, sequence numbers, ACKs, retransmission)
         |
@@ -104,9 +104,10 @@ in [`docs/protocol.md`](docs/protocol.md).
 
 ## Security model
 
-Encrypted DLTP currently requires an OpenComputers data card (or a compatible
-crypto provider) and a pre-shared key. It uses encrypt-then-MAC with independent
-keys, random IVs, and HMAC-SHA-256. Niobium does not expose `component`, `computer`,
+DLTP is currently plaintext-only. Encryption will return with the future naming
+and identity system, where it can authenticate the site being contacted rather
+than merely encrypting traffic with a manually shared key. Niobium does not
+expose `component`, `computer`,
 `filesystem`, `io`, `os`, `debug`, or the host `require`. Sites receive explicit
 capabilities instead. This is intentional: unrestricted OpenComputers APIs and a
 meaningful sandbox cannot coexist. On CC:Tweaked, Niobium also benefits from

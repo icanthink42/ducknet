@@ -6,35 +6,22 @@ DLTP.__index = DLTP
 local Server = {}
 Server.__index = Server
 
-local function pack(value, key, crypto)
-  local body = codec.encode(value)
-  if key then
-    return codec.encode({ v = 1, secure = true, envelope = crypto:seal(body, key) })
-  end
-  return codec.encode({ v = 1, secure = false, body = body })
+local function pack(value)
+  return codec.encode({ v = 1, body = codec.encode(value) })
 end
 
-local function unpackMessage(wire, key, crypto)
+local function unpackMessage(wire)
   local ok, outer = pcall(codec.decode, wire)
   if not ok or type(outer) ~= "table" or outer.v ~= 1 then return nil, "invalid DLTP message" end
-  local body
-  if outer.secure then
-    if not key or not crypto then return nil, "encrypted message not configured" end
-    body = crypto:open(outer.envelope, key)
-    if not body then return nil, "could not authenticate message" end
-  else
-    if key then return nil, "plaintext rejected" end
-    body = outer.body
-  end
-  local decoded, value = pcall(codec.decode, body)
+  local decoded, value = pcall(codec.decode, outer.body)
   if not decoded or type(value) ~= "table" then return nil, "invalid DLTP body" end
   return value
 end
 
 function DLTP.new(tcp, options)
   options = options or {}
-  return setmetatable({ tcp = tcp, key = options.key, crypto = options.crypto,
-    port = options.port or (options.key and 443 or 80), timeout = options.timeout or 10 }, DLTP)
+  return setmetatable({ tcp = tcp, port = options.port or 80,
+    timeout = options.timeout or 10 }, DLTP)
 end
 
 function DLTP:request(host, method, path, options)
@@ -44,13 +31,13 @@ function DLTP:request(host, method, path, options)
   local request = { v = 1, method = method or "GET", path = path or "/",
     headers = options.headers or {}, body = options.body or "" }
   local sent
-  sent, err = connection:send(pack(request, self.key, self.crypto))
+  sent, err = connection:send(pack(request))
   if not sent then connection:close() return nil, err end
   local wire
   wire, err = connection:receive(options.timeout or self.timeout)
   connection:close()
   if not wire then return nil, err end
-  return unpackMessage(wire, self.key, self.crypto)
+  return unpackMessage(wire)
 end
 
 function DLTP:server(options)
@@ -110,7 +97,7 @@ function Server:serveOnce(timeout)
   wire, err = connection:receive(self.dltp.timeout)
   if not wire then connection:close() return nil, err end
   local request
-  request, err = unpackMessage(wire, self.dltp.key, self.dltp.crypto)
+  request, err = unpackMessage(wire)
   local response
   if request then
     local ok, result = pcall(function() return self:_dispatch(request) end)
@@ -120,7 +107,7 @@ function Server:serveOnce(timeout)
   end
   response = response or { status = 204, headers = {}, body = "" }
   response.v = 1
-  local sent, sendError = connection:send(pack(response, self.dltp.key, self.dltp.crypto))
+  local sent, sendError = connection:send(pack(response))
   connection:close()
   if not sent then return nil, sendError end
   return true

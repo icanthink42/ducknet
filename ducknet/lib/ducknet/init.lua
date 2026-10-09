@@ -6,7 +6,6 @@ ducknet.IP = require("ducknet.ip")
 ducknet.ICMP = require("ducknet.icmp")
 ducknet.TCP = require("ducknet.tcp")
 ducknet.DLTP = require("ducknet.dltp")
-ducknet.Crypto = require("ducknet.crypto")
 
 -- Build a complete stack from a config table and an optional modem component.
 function ducknet.stack(configuration, modem)
@@ -21,9 +20,6 @@ function ducknet.stack(configuration, modem)
   local tcp = ducknet.TCP.new(ip, configuration.tcp)
   local icmp = ducknet.ICMP.new(ip)
   local dltpOptions = configuration.dltp or {}
-  if dltpOptions.key and not dltpOptions.crypto then
-    dltpOptions.crypto = ducknet.Crypto.new()
-  end
   local dltp = ducknet.DLTP.new(tcp, dltpOptions)
   return { link = link, ip = ip, icmp = icmp, tcp = tcp, dltp = dltp }
 end

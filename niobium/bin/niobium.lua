@@ -9,7 +9,7 @@ if not url then
   io.stderr:write("usage: niobium dltp://10.0.0.2/path [config.lua]\n")
   return
 end
-local host, path = url:match("^dltps?://([^/]+)(/.*)$")
+local host, path = url:match("^dltp://([^/]+)(/.*)$")
 if not host then host, path = url:match("^([^/]+)(/.*)$") end
 if not host then error("invalid DuckNet URL", 0) end
 

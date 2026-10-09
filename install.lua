@@ -28,7 +28,6 @@ local packages = {
     { "ducknet/lib/ducknet/tcp.lua", "/usr/lib/ducknet/tcp.lua" }
   },
   dltp = {
-    { "ducknet/lib/ducknet/crypto.lua", "/usr/lib/ducknet/crypto.lua" },
     { "ducknet/lib/ducknet/dltp.lua", "/usr/lib/ducknet/dltp.lua" },
     { "ducknet/lib/ducknet/init.lua", "/usr/lib/ducknet.lua" }
   },
@@ -224,6 +223,7 @@ end
 
 local function removeLegacyCommands()
   local paths = isComputerCraft and {
+    "/ducknet/lib/ducknet/crypto.lua",
     "/ipconfig.lua", "/route.lua", "/arp.lua", "/ping.lua",
     "/traceroute.lua", "/dltp.lua", "/router.lua", "/serve.lua",
     "/niobium.lua", "/uninstall-ducknet.lua", "/ducknet.lua", "/niobium",
@@ -231,6 +231,7 @@ local function removeLegacyCommands()
     "/duck-ping.lua", "/duck-traceroute.lua", "/duck-router.lua",
     "/duckserve.lua"
   } or {
+    "/usr/lib/ducknet/crypto.lua",
     "/usr/bin/duck-ipconfig.lua", "/usr/bin/duck-route.lua",
     "/usr/bin/duck-neighbors.lua", "/usr/bin/duck-ping.lua",
     "/usr/bin/duck-traceroute.lua", "/usr/bin/duck-router.lua",
