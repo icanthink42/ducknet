@@ -298,9 +298,9 @@ local function configureNetwork(role)
   local address = ask("DuckNet IP address", "10.0.0." .. defaultHost)
   local channel = number("Modem channel", 4660, 0, 65535)
   local ttl = number("Default TTL", 16, 1, 255)
-  local directNetwork = ask("Directly connected network", "10.0.0.0/24")
+  local subnet = ask("Subnet", "10.0.0.0/24")
   local dltpPort = number("DLTP port", role == "server" and 80 or 80, 1, 65535)
-  local routes = { { network = directNetwork, metric = 10 } }
+  local routes = { { network = subnet, metric = 10 } }
 
   if role ~= "router" then
     local gateway = ask("Default gateway (blank for none)", "")
