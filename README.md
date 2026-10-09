@@ -69,6 +69,10 @@ and never replaces an existing config.
 The optional `tools` package installs familiar networking commands:
 
 ```text
+ip interface list [config]              list configured network interfaces
+ip interface add <name> <modem> <cidr> [channel]
+                                        persist a new router interface
+ip interface remove <name>              remove a router interface
 ipconfig [config]                      adapter information
 route [destination] [config]           routing table or route lookup
 arp [config]                           logical IP to modem mappings

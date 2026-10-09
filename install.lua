@@ -43,6 +43,7 @@ local packages = {
   },
   tools = {
     { "ducknet/lib/ducknet/cli.lua", "/usr/lib/ducknet/cli.lua" },
+    { "ducknet/bin/ip.lua", "/usr/bin/ip.lua" },
     { "ducknet/bin/ipconfig.lua", "/usr/bin/ipconfig.lua" },
     { "ducknet/bin/route.lua", "/usr/bin/route.lua" },
     { "ducknet/bin/neighbors.lua", "/usr/bin/arp.lua" },

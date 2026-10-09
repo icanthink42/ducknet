@@ -47,7 +47,7 @@ local common = isComputerCraft and {
   "/startup/ducknet-server.lua", "/startup/00-ducknet-path.lua"
 } or {
   "/usr/lib/ducknet.lua", "/usr/lib/ducknet", "/usr/lib/niobium",
-  "/usr/share/ducknet", "/usr/bin/ipconfig.lua", "/usr/bin/route.lua",
+  "/usr/share/ducknet", "/usr/bin/ip.lua", "/usr/bin/ipconfig.lua", "/usr/bin/route.lua",
   "/usr/bin/arp.lua", "/usr/bin/ping.lua", "/usr/bin/traceroute.lua",
   "/usr/bin/dltp.lua", "/usr/bin/router.lua", "/usr/bin/serve.lua",
   "/usr/bin/niobium.lua", "/usr/bin/uninstall-ducknet.lua",

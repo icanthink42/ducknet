@@ -55,6 +55,7 @@ end
 
 local client = runProfile("client", { "", "client", "", "", "", "", "", "" })
 assert(client["/ducknet/bin/niobium.lua"], "client did not install Niobium")
+assert(client["/ducknet/bin/ip.lua"], "client did not install the ip command")
 assert(client["/ducknet/bin/ping.lua"], "client did not install normal command names")
 assert(client["/ducknet/bin/ping.lua"]:find("/ducknet/lib/?.lua", 1, true),
   "CC command did not receive the DuckNet library path")

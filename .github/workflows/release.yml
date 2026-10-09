@@ -38,7 +38,9 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y lua5.4
 
       - name: Test
-        run: lua tests/run.lua .
+        run: |
+          lua tests/run.lua .
+          lua tests/ip_command.lua .
 
       - name: Build self-contained installer
         run: |
