@@ -69,10 +69,22 @@ and never replaces an existing config.
 The optional `tools` package installs familiar networking commands:
 
 ```text
+ip address set <address/prefix>          set a host's IP address and subnet
+ip gateway set <ip|none>                 set or remove a host's default gateway
+ip channel set <channel>                 set a host's modem channel
+ip ttl set <ttl>                         set the default packet TTL
+ip forwarding set <on|off>               enable or disable packet forwarding
+ip dltp-port set <port>                  set the DLTP service port
 ip interface list [config]              list configured network interfaces
 ip interface add <name> <modem> <cidr> [channel]
                                         persist a new router interface
+ip interface set <name> <modem> <cidr> [channel]
+                                        replace an interface's configuration
 ip interface remove <name>              remove a router interface
+ip route list                           list persistent routes
+ip route add <cidr> <interface> <via|direct> [metric]
+                                        add a persistent static route
+ip route remove <cidr> [interface]      remove persistent static routes
 ipconfig [config]                      adapter information
 route [destination] [config]           routing table or route lookup
 arp [config]                           logical IP to modem mappings
