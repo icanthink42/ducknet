@@ -23,19 +23,20 @@ function ICMP.new(ip, options)
       ip:send(packet.src, self.PROTOCOL, codec.encode({
         v = 1, type = "echo_reply", id = message.id,
         sequence = message.sequence, data = message.data or ""
-      }))
+      }), { source = packet.dst })
       return true
     end
     return false
   end)
 
   ip:onDrop(function(reason, packet)
-    if reason == "ttl exceeded" and packet and packet.src ~= ip.address then
+    if reason == "ttl exceeded" and packet and not ip.localAddresses[packet.src] then
       local original = packet.protocol == self.PROTOCOL and decode(packet.payload) or nil
+      local reporter = ip:sourceFor(packet.src) or ip.address
       ip:send(packet.src, self.PROTOCOL, codec.encode({
         v = 1, type = "time_exceeded", originalId = packet.id,
         echoId = original and original.id or nil,
-        reporter = ip.address
+        reporter = reporter
       }))
     end
   end)
@@ -84,4 +85,3 @@ function ICMP:ping(destination, options)
 end
 
 return ICMP
-

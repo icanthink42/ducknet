@@ -1,22 +1,13 @@
 local config = require("ducknet.config")
-local Link = require("ducknet.modem")
-local IP = require("ducknet.ip")
-local ICMP = require("ducknet.icmp")
+local ducknet = require("ducknet")
 
 local cli = {}
 
 function cli.load(path, enableICMP)
   local settings, err = config.load(path)
   if not settings then error("could not load DuckNet config: " .. tostring(err), 0) end
-  local linkOptions = {}
-  for key, value in pairs(settings.link or {}) do linkOptions[key] = value end
-  linkOptions.address = settings.ip.address
-  local link = Link.new(nil, linkOptions)
-  local ip = IP.new(link, settings.ip)
-  for _, route in ipairs(settings.routes or {}) do
-    ip:addRoute(route.network, route.via, route.metric)
-  end
-  return settings, link, ip, enableICMP and ICMP.new(ip) or nil
+  local stack = ducknet.stack(settings)
+  return settings, stack.link, stack.ip, enableICMP and stack.icmp or nil, stack
 end
 
 function cli.number(value, name, minimum, maximum)

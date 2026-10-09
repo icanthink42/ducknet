@@ -14,7 +14,7 @@ return {
   },
   routes = {
     -- Direct logical neighbors use via = nil.
-    { network = "10.0.0.0/24", via = nil, metric = 10 }
+    { network = "10.0.0.0/24", via = nil, metric = 10 },
     -- { network = "0.0.0.0/0", via = "10.0.0.1", metric = 100 }
   },
   tcp = { mtu = 4096, timeout = 2, retries = 4 },

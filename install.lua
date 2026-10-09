@@ -59,7 +59,7 @@ local packages = {
 
 local dependencies = {
   core = {}, tcp = { "core" }, dltp = { "core", "tcp" },
-  server = { "dltp" }, router = { "core" }, tools = { "dltp" },
+  server = { "dltp" }, router = { "dltp" }, tools = { "dltp" },
   niobium = { "dltp" }
 }
 
@@ -295,6 +295,10 @@ local function defaultSubnet(address)
   return "10.0.0.0/24"
 end
 
+local function defaultRouterAddress(index)
+  return tostring(9 + index) .. ".0.0.1"
+end
+
 local function configureNetwork(role)
   if hadConfig and not yes("Replace the existing DuckNet configuration", false) then
     io.write("keep " .. configPath .. "\n")
@@ -310,18 +314,38 @@ local function configureNetwork(role)
   local ttl = number("Default TTL", 16, 1, 255)
   local subnet = ask("Subnet", defaultSubnet(address))
   local dltpPort = number("DLTP port", role == "server" and 80 or 80, 1, 65535)
-  local routes = { { network = subnet, metric = 10 } }
+  local routes, interfaces = {}, nil
 
   if role ~= "router" then
+    routes[1] = { network = subnet, metric = 10 }
     local gateway = ask("Default gateway (blank for none)", "")
     if gateway ~= "" then
       routes[#routes + 1] = { network = "0.0.0.0/0", via = gateway, metric = 100 }
     end
   else
-    while yes("Add another route", false) do
+    interfaces = {
+      { name = "net1", modem = ask("First modem side or component address", "left"),
+        address = address, port = channel, network = subnet }
+    }
+    while yes("Add another router interface", #interfaces < 2) do
+      local index = #interfaces + 1
+      local interfaceAddress = ask("Interface " .. index .. " DuckNet IP address",
+        defaultRouterAddress(index))
+      interfaces[index] = {
+        name = "net" .. index,
+        address = interfaceAddress,
+        port = number("Interface " .. index .. " modem channel", 4660, 0, 65535),
+        network = ask("Interface " .. index .. " subnet", defaultSubnet(interfaceAddress)),
+        modem = ask("Interface " .. index .. " modem side or component address", "right")
+      }
+    end
+    while yes("Add a static route", false) do
+      local network = ask("Destination network (CIDR)")
+      local nextHop = ask("Next-hop DuckNet IP (blank for direct)", "")
       routes[#routes + 1] = {
-        network = ask("Destination network (CIDR)"),
-        via = ask("Next-hop DuckNet IP"),
+        network = network,
+        via = nextHop ~= "" and nextHop or nil,
+        interface = ask("Outgoing interface", interfaces[1].name),
         metric = number("Metric", 100, 0, 65535)
       }
     end
@@ -351,12 +375,26 @@ local function configureNetwork(role)
   end
   lines[#lines + 1] = "    }"
   lines[#lines + 1] = "  },"
-  lines[#lines + 1] = "  ip = { address = " .. quote(address) ..
-    ", forwarding = " .. tostring(role == "router") .. ", ttl = " .. ttl .. " },"
+  if interfaces then
+    lines[#lines + 1] = "  interfaces = {"
+    for _, interface in ipairs(interfaces) do
+      lines[#lines + 1] = "    { name = " .. quote(interface.name) ..
+        ", modem = " .. quote(interface.modem) ..
+        ", address = " .. quote(interface.address) ..
+        ", network = " .. quote(interface.network) ..
+        ", port = " .. interface.port .. " },"
+    end
+    lines[#lines + 1] = "  },"
+    lines[#lines + 1] = "  ip = { forwarding = true, ttl = " .. ttl .. " },"
+  else
+    lines[#lines + 1] = "  ip = { address = " .. quote(address) ..
+      ", forwarding = false, ttl = " .. ttl .. " },"
+  end
   lines[#lines + 1] = "  routes = {"
   for _, route in ipairs(routes) do
     local via = route.via and (", via = " .. quote(route.via)) or ""
-    lines[#lines + 1] = "    { network = " .. quote(route.network) .. via ..
+    local interface = route.interface and (", interface = " .. quote(route.interface)) or ""
+    lines[#lines + 1] = "    { network = " .. quote(route.network) .. via .. interface ..
       ", metric = " .. route.metric .. " },"
   end
   lines[#lines + 1] = "  },"

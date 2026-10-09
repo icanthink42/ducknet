@@ -6,9 +6,11 @@ ignored, allowing compatible additions.
 ## IP
 
 An IP packet contains `v`, `id`, `src`, `dst`, `ttl`, `protocol`, `payload`, and
-`hops`. Routers decrement TTL before forwarding and append their logical address
-to `hops`. Routes use longest-prefix match and then the lowest metric. IP protocol
-`6` carries DuckNet TCP.
+`hops`. Routers decrement TTL before forwarding and append the outgoing
+interface's logical address to `hops`. Routes use longest-prefix match and then
+the lowest metric. A router can have multiple interfaces, each with its own
+modem, IP address, and directly connected subnet; routes select an outgoing
+interface. IP protocol `6` carries DuckNet TCP.
 
 ## ICMP
 

@@ -62,13 +62,20 @@ assert(not client["/duck-ping.lua"], "client retained a legacy command name")
 assert(not client["/ducknet/bin/serve.lua"], "client unexpectedly installed server")
 
 local router = runProfile("router", {
-  "", "router", "172.16.42.99", "", "", "", "", ""
+  "", "router", "172.16.42.99", "", "", "", "", "",
+  "", "", "", "", "", "", ""
 })
 assert(router["/ducknet/bin/router.lua"], "router runtime was not installed")
 assert(router["/etc/ducknet/config.lua"]:find("forwarding = true", 1, true))
-assert(router["/etc/ducknet/config.lua"]:find(
-  'network = "172.16.42.0/24"', 1, true),
+local routerConfig = assert(load(router["/etc/ducknet/config.lua"], "=router-config"))()
+assert(#routerConfig.interfaces == 2, "router did not configure two interfaces")
+assert(routerConfig.interfaces[1].address == "172.16.42.99")
+assert(routerConfig.interfaces[1].network == "172.16.42.0/24",
   "router subnet default was not derived from its IP address")
+assert(routerConfig.interfaces[1].modem == "left")
+assert(routerConfig.interfaces[2].address == "11.0.0.1")
+assert(routerConfig.interfaces[2].network == "11.0.0.0/24")
+assert(routerConfig.interfaces[2].modem == "right")
 assert(router["/startup/ducknet-router.lua"], "router startup was not installed")
 assert(load(router["/startup/ducknet-router.lua"], "=router-startup"))
 assert(router["/startup/ducknet-router.lua"]:find("/ducknet/bin/router.lua", 1, true))

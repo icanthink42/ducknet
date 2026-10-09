@@ -23,7 +23,7 @@ assert(not pcall(codec.decode, encoded .. "junk"))
 
 local wire = {}
 local function link(name)
-  return {
+  local result = {
     send = function(_, nextHop, frame)
       wire[#wire + 1] = { from = name, to = nextHop, frame = frame }
       return true
@@ -35,6 +35,19 @@ local function link(name)
       return nil, "timeout"
     end
   }
+  function result:receiveAny(links)
+    for index, item in ipairs(wire) do
+      for _, candidate in ipairs(links) do
+        if item.to == candidate.name then
+          table.remove(wire, index)
+          return item.from, item.frame, candidate
+        end
+      end
+    end
+    return nil, "timeout"
+  end
+  result.name = name
+  return result
 end
 
 local left = IP.new(link("10.0.0.1"), { address = "10.0.0.1", clock = os.clock })
@@ -75,6 +88,38 @@ local expired = assert(left:receive(ICMP.PROTOCOL, 0.01))
 local expiredMessage = codec.decode(expired.payload)
 equal(expiredMessage.type, "time_exceeded")
 equal(expiredMessage.reporter, "10.0.0.2")
+
+-- A single router can own an address on each of two modem interfaces.
+wire = {}
+local client = IP.new(link("11.0.0.13"), { address = "11.0.0.13", clock = os.clock })
+local multiRouter = IP.new(link("10.0.0.1"), {
+  address = "10.0.0.1", interface = "net10", forwarding = true, clock = os.clock
+})
+multiRouter:addInterface(link("11.0.0.1"), { name = "net11", address = "11.0.0.1" })
+local server = IP.new(link("10.0.0.10"), { address = "10.0.0.10", clock = os.clock })
+client:addRoute("0.0.0.0/0", "11.0.0.1")
+multiRouter:addRoute("10.0.0.0/24", nil, 10, "net10")
+multiRouter:addRoute("11.0.0.0/24", nil, 10, "net11")
+server:addRoute("0.0.0.0/0", "10.0.0.1")
+ICMP.new(client)
+ICMP.new(multiRouter)
+ICMP.new(server)
+assert(client:send("10.0.0.1", ICMP.PROTOCOL, codec.encode({
+  v = 1, type = "echo_request", id = "router-echo", sequence = 1
+})))
+multiRouter:pump(0)
+local routerReply = assert(client:receive(ICMP.PROTOCOL, 0.01))
+equal(routerReply.src, "10.0.0.1")
+
+assert(client:send("10.0.0.10", ICMP.PROTOCOL, codec.encode({
+  v = 1, type = "echo_request", id = "multi-echo", sequence = 1
+})))
+equal(select(2, multiRouter:pump(0)), "forwarded")
+server:pump(0)
+equal(select(2, multiRouter:pump(0)), "forwarded")
+local multiReply = assert(client:receive(ICMP.PROTOCOL, 0.01))
+equal(multiReply.src, "10.0.0.10")
+equal(multiReply.dst, "11.0.0.13")
 
 -- Run client and server stacks cooperatively over an in-memory IP transport.
 local queues, now = { client = {}, server = {} }, 0
@@ -164,7 +209,8 @@ _G.peripheral = {
   find = function(_, filter)
     filter("left", ccModem)
     return ccModem
-  end
+  end,
+  wrap = function() return ccModem end
 }
 os.startTimer = function() return 7 end
 os.cancelTimer = function() end
@@ -181,6 +227,22 @@ end
 local from, frame = ccLink:receive(1)
 equal(from, "10.0.0.2")
 equal(frame, "reply")
+
+local configuredRouter = require("ducknet").stack({
+  link = { peers = {} },
+  interfaces = {
+    { name = "net10", modem = "left", address = "10.0.0.1",
+      network = "10.0.0.0/24", port = 4660 },
+    { name = "net11", modem = "right", address = "11.0.0.1",
+      network = "11.0.0.0/24", port = 4661 }
+  },
+  ip = { forwarding = true, ttl = 16 }, routes = {}, tcp = {}, dltp = {}
+})
+equal(#configuredRouter.links, 2)
+equal(#configuredRouter.ip.interfaces, 2)
+equal(#configuredRouter.ip.routes, 2)
+local _, configuredRoute = configuredRouter.ip:route("11.0.0.13")
+equal(configuredRoute.interface.name, "net11")
 _G.peripheral = savedPeripheral
 os.pullEvent, os.startTimer, os.cancelTimer = savedPullEvent, savedStartTimer, savedCancelTimer
 package.loaded["ducknet.modem"] = nil

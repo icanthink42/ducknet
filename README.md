@@ -39,12 +39,14 @@ the first argument when testing a fork.
 The installer provides these profiles:
 
 - `client`: Niobium, DLTP, TCP/IP, and diagnostic tools
-- `router`: packet forwarding, route configuration, and diagnostic tools
+- `router`: multi-interface packet forwarding, route configuration, and diagnostic tools
 - `server`: the DLTP server runtime, network configuration, and website setup
 - `developer`: every library, program, example, and bundled website
 - `custom`: manual package selection
 
 Client, router, and server profiles guide you through network configuration.
+The router profile configures two interfaces by default. Each interface has its
+own modem, IP address, subnet, and channel, so one router can join two subnets.
 The server profile can activate the bundled Foo Bar test or Hello World site,
 or download a DuckNet server application from a GitHub raw/blob URL. Start a
 configured server with `serve /etc/ducknet/site.lua`, or a router with
@@ -84,20 +86,25 @@ separately before deleting `/etc/ducknet` configuration and website data.
 ## Minimal router
 
 ```lua
-local modem = require("component").modem
-local Link = require("ducknet.modem")
-local IP = require("ducknet.ip")
-
-local link = Link.new(modem, { port = 4660, peers = {
-  ["10.0.0.2"] = "neighbor-modem-component-address"
-}})
-local ip = IP.new(link, { address = "10.0.0.1", forwarding = true })
-local ICMP = require("ducknet.icmp")
-ICMP.new(ip) -- answer pings and emit TTL-exceeded messages
-ip:addRoute("10.0.0.2/32", "10.0.0.2")
-
-while true do ip:pump(5) end
+return {
+  link = { broadcastUnknown = false, peers = {} },
+  interfaces = {
+    { name = "net10", modem = "left", address = "10.0.0.1",
+      network = "10.0.0.0/24", port = 4660 },
+    { name = "net11", modem = "right", address = "11.0.0.1",
+      network = "11.0.0.0/24", port = 4660 },
+  },
+  ip = { forwarding = true, ttl = 16 },
+  routes = {},
+  tcp = { mtu = 4096, timeout = 2, retries = 4 },
+  dltp = { port = 80 },
+}
 ```
+
+A host on `10.0.0.0/24` uses `10.0.0.1` as its gateway; a host on
+`11.0.0.0/24` uses `11.0.0.1`. The router automatically adds a direct route for
+each interface subnet. Static routes use `interface = "net10"` (or another
+interface name) and may also specify `via` for the next-hop router.
 
 See [`examples/`](examples/) for a server and router. Protocol documentation is
 in [`docs/protocol.md`](docs/protocol.md).
