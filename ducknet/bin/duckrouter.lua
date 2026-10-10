@@ -8,7 +8,12 @@ settings.ip.forwarding = true
 local stack = ducknet.stack(settings)
 local dhcpServer
 if settings.dhcp and settings.dhcp.pools and #settings.dhcp.pools > 0 then
-  dhcpServer = ducknet.DHCP.server(stack.udp, stack.ip, settings.dhcp)
+  local ok, serverOrError = pcall(ducknet.DHCP.server, stack.udp, stack.ip, settings.dhcp)
+  if ok then
+    dhcpServer = serverOrError
+  else
+    io.stderr:write("DuckNet DHCP is disabled: " .. tostring(serverOrError) .. "\n")
+  end
 end
 local addresses = {}
 for _, interface in ipairs(stack.ip.interfaces) do

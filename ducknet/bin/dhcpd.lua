@@ -28,6 +28,17 @@ local function contains(cidr, address)
   return math.floor(ipv4(base) / block) == math.floor(ipv4(address) / block)
 end
 
+local function usableHost(cidr, address)
+  local base, prefix = cidr:match("^([^/]+)/(%d+)$")
+  prefix = tonumber(prefix)
+  assert(base and prefix and prefix <= 32, "invalid interface subnet")
+  if prefix > 30 then return true end
+  local block = 2 ^ (32 - prefix)
+  local network = math.floor(ipv4(base) / block) * block
+  local value = ipv4(address)
+  return value > network and value < network + block - 1
+end
+
 local function load(path)
   path = path or "/etc/ducknet/config.lua"
   local settings, err = config.load(path)
@@ -69,6 +80,8 @@ if family == "pool" and action == "add" then
   local network = interface.network or interface.subnet
   assert(contains(network, first) and contains(network, last),
     "DHCP pool must be inside the interface subnet")
+  assert(usableHost(network, first) and usableHost(network, last),
+    "DHCP pool cannot include the network or broadcast address")
   local routerAddress = ipv4(interface.address)
   assert(routerAddress < ipv4(first) or routerAddress > ipv4(last),
     "DHCP pool cannot include the router address")

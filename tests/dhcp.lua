@@ -96,6 +96,11 @@ dhcpd("pool", "list", routerPath)
 dhcpd("pool", "remove", "lan", routerPath)
 routerConfig = assert(config.load(routerPath))
 assert(#routerConfig.dhcp.pools == 0)
+local invalidPool = pcall(dhcpd, "pool", "add", "lan", "11.0.0.0",
+  "11.0.0.200", "600", routerPath)
+assert(not invalidPool, "DHCP command accepted the subnet's network address")
+routerConfig = assert(config.load(routerPath))
+assert(#routerConfig.dhcp.pools == 0)
 
 os.remove(leasePath)
 os.remove(leasePath .. ".ducknet-new")
