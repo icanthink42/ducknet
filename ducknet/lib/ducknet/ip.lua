@@ -118,9 +118,16 @@ function IP:sourceFor(destination)
 end
 
 function IP:_transmit(packet)
+  return self:_transmitOn(packet)
+end
+
+function IP:_transmitOn(packet, interfaceName)
   local nextHop, routeOrError = self:route(packet.dst)
-  if not nextHop then return nil, routeOrError end
-  return routeOrError.interface.link:send(nextHop, codec.encode(packet))
+  local interface = interfaceName and self.interfaceByName[interfaceName] or
+    (type(routeOrError) == "table" and routeOrError.interface)
+  if not interface then return nil, routeOrError end
+  nextHop = nextHop or packet.dst
+  return interface.link:send(nextHop, codec.encode(packet))
 end
 
 function IP:send(destination, protocol, payload, options)
@@ -129,8 +136,10 @@ function IP:send(destination, protocol, payload, options)
   assert(type(payload) == "string", "payload must be a string")
   options = options or {}
   local _, routeOrError = self:route(destination)
-  if type(routeOrError) ~= "table" then return nil, routeOrError end
-  local source = options.source or routeOrError.interface.address
+  local interface = options.interface and self.interfaceByName[options.interface] or
+    (type(routeOrError) == "table" and routeOrError.interface)
+  if not interface then return nil, routeOrError end
+  local source = options.source or interface.address
   self.counter = self.counter + 1
   local packet = {
     v = 1, id = source .. ":" .. self.counter,
@@ -138,7 +147,7 @@ function IP:send(destination, protocol, payload, options)
     ttl = options.ttl or self.defaultTTL, payload = payload,
     hops = { source }
   }
-  local sent, err = self:_transmit(packet)
+  local sent, err = self:_transmitOn(packet, options.interface)
   if not sent then return nil, err end
   return true, packet
 end
@@ -151,13 +160,14 @@ end
 function IP:pump(timeout)
   local links = {}
   for index, interface in ipairs(self.interfaces) do links[index] = interface.link end
-  local _, frame
+  local _, frame, incomingLink
   if #links == 1 then
     _, frame = links[1]:receive(timeout)
+    incomingLink = links[1]
   else
     assert(type(links[1].receiveAny) == "function",
       "multi-interface links must implement receiveAny")
-    _, frame = links[1]:receiveAny(links, timeout)
+    _, frame, incomingLink = links[1]:receiveAny(links, timeout)
   end
   if not frame then return nil, "timeout" end
   local ok, packet = pcall(codec.decode, frame)
@@ -169,7 +179,10 @@ function IP:pump(timeout)
   end
   local addressesValid = pcall(function() ipv4(packet.src) ipv4(packet.dst) end)
   if not addressesValid then return self:_drop("invalid packet") end
-  if self.localAddresses[packet.dst] then
+  for _, interface in ipairs(self.interfaces) do
+    if interface.link == incomingLink then packet.interface = interface.name break end
+  end
+  if self.localAddresses[packet.dst] or packet.dst == "255.255.255.255" then
     for _, handler in ipairs(self.handlers[packet.protocol] or {}) do
       local handled, consumed = pcall(handler, packet)
       if handled and consumed then return packet, "consumed" end
@@ -186,6 +199,7 @@ function IP:pump(timeout)
   local _, route = self:route(packet.dst)
   if type(route) ~= "table" then return self:_drop(route, packet) end
   packet.hops[#packet.hops + 1] = route.interface.address
+  packet.interface = nil
   local sent, err = self:_transmit(packet)
   if not sent then return self:_drop(err, packet) end
   return packet, "forwarded"

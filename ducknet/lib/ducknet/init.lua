@@ -4,6 +4,8 @@ ducknet.codec = require("ducknet.codec")
 ducknet.Link = require("ducknet.modem")
 ducknet.IP = require("ducknet.ip")
 ducknet.ICMP = require("ducknet.icmp")
+ducknet.UDP = require("ducknet.udp")
+ducknet.DHCP = require("ducknet.dhcp")
 ducknet.TCP = require("ducknet.tcp")
 ducknet.DLTP = require("ducknet.dltp")
 
@@ -54,7 +56,8 @@ function ducknet.stack(configuration, modem)
   else
     local linkOptions = copy(configuration.link)
     linkOptions.address = configuration.ip.address
-    links[1] = ducknet.Link.new(modem, linkOptions)
+    linkOptions.modemName = linkOptions.modem
+    links[1] = ducknet.Link.new(modem or resolveModem(linkOptions.modem), linkOptions)
     ip = ducknet.IP.new(links[1], configuration.ip)
   end
 
@@ -62,10 +65,12 @@ function ducknet.stack(configuration, modem)
     ip:addRoute(route.network, route.via, route.metric, route.interface)
   end
   local tcp = ducknet.TCP.new(ip, configuration.tcp)
+  local udp = ducknet.UDP.new(ip)
   local icmp = ducknet.ICMP.new(ip)
   local dltpOptions = configuration.dltp or {}
   local dltp = ducknet.DLTP.new(tcp, dltpOptions)
-  return { link = links[1], links = links, ip = ip, icmp = icmp, tcp = tcp, dltp = dltp }
+  return { link = links[1], links = links, ip = ip, icmp = icmp,
+    udp = udp, tcp = tcp, dltp = dltp }
 end
 
 return ducknet

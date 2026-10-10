@@ -20,6 +20,8 @@ local packages = {
     { "ducknet/lib/ducknet/modem.lua", "/usr/lib/ducknet/modem.lua" },
     { "ducknet/lib/ducknet/ip.lua", "/usr/lib/ducknet/ip.lua" },
     { "ducknet/lib/ducknet/icmp.lua", "/usr/lib/ducknet/icmp.lua" },
+    { "ducknet/lib/ducknet/udp.lua", "/usr/lib/ducknet/udp.lua" },
+    { "ducknet/lib/ducknet/dhcp.lua", "/usr/lib/ducknet/dhcp.lua" },
     { "ducknet/lib/ducknet/config.lua", "/usr/lib/ducknet/config.lua" },
     { "ducknet/etc/ducknet/config.lua", "/etc/ducknet/config.lua", true },
     { "uninstall.lua", "/usr/bin/uninstall-ducknet.lua" }
@@ -45,6 +47,8 @@ local packages = {
   tools = {
     { "ducknet/lib/ducknet/cli.lua", "/usr/lib/ducknet/cli.lua" },
     { "ducknet/bin/ip.lua", "/usr/bin/ip.lua" },
+    { "ducknet/bin/dhclient.lua", "/usr/bin/dhclient.lua" },
+    { "ducknet/bin/dhcpd.lua", "/usr/bin/dhcpd.lua" },
     { "ducknet/bin/ipconfig.lua", "/usr/bin/ipconfig.lua" },
     { "ducknet/bin/route.lua", "/usr/bin/route.lua" },
     { "ducknet/bin/neighbors.lua", "/usr/bin/arp.lua" },

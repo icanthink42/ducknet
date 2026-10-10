@@ -33,6 +33,7 @@ if not isComputerCraft then
   if ok then
     pcall(shell.execute, "rc ducknet-router disable")
     pcall(shell.execute, "rc ducknet-server disable")
+    pcall(shell.execute, "rc ducknet-dhcp disable")
   end
 end
 
@@ -44,18 +45,20 @@ local common = isComputerCraft and {
   "/duck-ipconfig.lua", "/duck-route.lua", "/duck-neighbors.lua",
   "/duck-ping.lua", "/duck-traceroute.lua", "/duck-router.lua",
   "/duckserve.lua", "/startup/ducknet-router.lua",
-  "/startup/ducknet-server.lua", "/startup/00-ducknet-path.lua"
+  "/startup/ducknet-server.lua", "/startup/00-ducknet-path.lua",
+  "/startup/10-ducknet-dhcp.lua"
 } or {
   "/usr/lib/ducknet.lua", "/usr/lib/ducknet", "/usr/lib/niobium",
   "/usr/share/ducknet", "/usr/bin/ip.lua", "/usr/bin/ipconfig.lua", "/usr/bin/route.lua",
   "/usr/bin/arp.lua", "/usr/bin/ping.lua", "/usr/bin/traceroute.lua",
-  "/usr/bin/dltp.lua", "/usr/bin/router.lua", "/usr/bin/serve.lua",
+  "/usr/bin/dltp.lua", "/usr/bin/dhclient.lua", "/usr/bin/dhcpd.lua",
+  "/usr/bin/router.lua", "/usr/bin/serve.lua",
   "/usr/bin/niobium.lua", "/usr/bin/uninstall-ducknet.lua",
   "/usr/bin/duck-ipconfig.lua", "/usr/bin/duck-route.lua",
   "/usr/bin/duck-neighbors.lua", "/usr/bin/duck-ping.lua",
   "/usr/bin/duck-traceroute.lua", "/usr/bin/duck-router.lua",
   "/usr/bin/duckserve.lua", "/etc/rc.d/ducknet-router.lua",
-  "/etc/rc.d/ducknet-server.lua"
+  "/etc/rc.d/ducknet-server.lua", "/etc/rc.d/ducknet-dhcp.lua"
 }
 
 for _, path in ipairs(common) do

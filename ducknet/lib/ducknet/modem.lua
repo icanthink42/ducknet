@@ -95,11 +95,16 @@ end
 
 function Link:send(nextHop, frame)
   if self.platform == "computercraft" then
+    local target = nextHop
+    if nextHop == "255.255.255.255" then target = nil end
     self.modem.transmit(self.port, self.port, {
       marker = "ducknet:1", source = self.address,
-      target = nextHop, frame = frame
+      target = target, frame = frame
     })
     return true
+  end
+  if nextHop == "255.255.255.255" then
+    return self.modem.broadcast(self.port, "ducknet:1", frame)
   end
   local hardwareAddress = self.peers[nextHop]
   if hardwareAddress then

@@ -21,3 +21,8 @@ for _, link in ipairs(stack.links) do
   for _ in pairs(link.peers) do peerCount = peerCount + 1 end
 end
 io.write("  Routes / neighbors  . : " .. routeCount .. " / " .. peerCount .. "\n")
+local dhcp = settings.dhcp and settings.dhcp.client
+if dhcp and dhcp.enabled then
+  io.write("  DHCP server . . . . . : " .. tostring(dhcp.server) .. "\n")
+  io.write("  DHCP lease expires  . : " .. tostring(dhcp.expires) .. "\n")
+end

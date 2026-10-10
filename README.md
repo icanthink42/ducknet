@@ -5,12 +5,12 @@ deliberately keeps the layers separate so programs can use only the part they
 need:
 
 ```text
-Niobium application (sandboxed Lua)
-        |
-DLTP request/response
-        |
-DuckNet TCP (connections, sequence numbers, ACKs, retransmission)
-        |
+Niobium application                    DHCP address assignment
+        |                                      |
+DLTP request/response                  DuckNet UDP (datagrams)
+        |                                      |
+DuckNet TCP (ACKs and retransmission)          |
+        |                                      |
 DuckNet IP (addresses, longest-prefix routes, TTL, hops)
         |
 CC:Tweaked or OpenComputers modem
@@ -94,6 +94,15 @@ ip route list                           list persistent routes
 ip route add <cidr> <interface> <via|direct> [metric]
                                         add a persistent static route
 ip route remove <cidr> [interface]      remove persistent static routes
+dhcpd pool list                        list router DHCP pools
+dhcpd pool add <interface> <first> <last> [lease-seconds]
+                                        serve addresses on an interface
+dhcpd pool remove <interface>          remove an interface's DHCP pool
+dhcpd lease list                       list persistent leases
+dhclient enable <modem> [channel]      acquire an address and enable renewal
+dhclient renew                         renew the current DHCP lease
+dhclient status                        show the current lease
+dhclient release                       return and disable the current lease
 ipconfig [config]                      adapter information
 route [destination] [config]           routing table or route lookup
 arp [config]                           logical IP to modem mappings
@@ -107,6 +116,32 @@ uninstall-ducknet                      remove DuckNet
 
 The uninstaller removes libraries, programs, and startup services, then asks
 separately before deleting `/etc/ducknet` configuration and website data.
+
+## DHCP
+
+DuckNet DHCP uses UDP ports 67 and 68 and the standard four-step
+DISCOVER/OFFER/REQUEST/ACK exchange. On a router, create a pool for a directly
+connected client interface and reboot:
+
+```text
+dhcpd pool add net11 11.0.0.100 11.0.0.200 3600
+reboot
+```
+
+On a client attached through its left modem, acquire a lease:
+
+```text
+dhclient enable left 4660
+reboot
+```
+
+The lease supplies the address, prefix, and default gateway. It is stored in the
+normal DuckNet configuration, renewed automatically halfway through its lifetime
+on systems with background-task support, and displayed by `ipconfig` and
+`dhclient status`. DHCP broadcasts remain on their local cable/interface;
+centralized DHCP across routers will require the future relay service. DHCP is
+currently unauthenticated, so clients trust DHCP servers on their physical modem
+network.
 
 ## Minimal router
 

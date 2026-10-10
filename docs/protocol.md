@@ -12,6 +12,25 @@ the lowest metric. A router can have multiple interfaces, each with its own
 modem, IP address, and directly connected subnet; routes select an outgoing
 interface. IP protocol `6` carries DuckNet TCP.
 
+The limited broadcast address `255.255.255.255` is delivered to every DuckNet
+host listening on the local modem network and is never forwarded by a router.
+
+## UDP
+
+IP protocol `17` carries DuckNet UDP. A datagram contains `v`, `srcPort`,
+`dstPort`, and `payload`. UDP provides message boundaries but no connection,
+ordering, acknowledgement, or retransmission. Applications which require those
+properties use TCP instead.
+
+## DHCP
+
+DuckNet DHCP uses UDP server port 67 and client port 68. A client without an
+address sends broadcast DISCOVER and REQUEST messages from `0.0.0.0`; the server
+returns broadcast OFFER and ACK messages. Messages include a transaction ID and
+persistent client ID. An ACK assigns an address, prefix, default gateway, server
+identifier, and lease duration. Servers persist leases and clients renew them
+halfway through their lifetime. Routers do not forward DHCP broadcasts.
+
 ## ICMP
 
 IP protocol `1` carries diagnostic control messages. Version 1 defines echo

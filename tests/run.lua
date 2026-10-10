@@ -5,6 +5,7 @@ package.path = root .. "/ducknet/lib/?.lua;" .. root .. "/ducknet/lib/?/init.lua
 local codec = require("ducknet.codec")
 local IP = require("ducknet.ip")
 local ICMP = require("ducknet.icmp")
+local UDP = require("ducknet.udp")
 local TCP = require("ducknet.tcp")
 local DLTP = require("ducknet.dltp")
 local Sandbox = require("niobium.sandbox")
@@ -89,6 +90,13 @@ local expired = assert(left:receive(ICMP.PROTOCOL, 0.01))
 local expiredMessage = codec.decode(expired.payload)
 equal(expiredMessage.type, "time_exceeded")
 equal(expiredMessage.reporter, "10.0.0.2")
+
+local leftUDP, rightUDP = UDP.new(left), UDP.new(right)
+assert(leftUDP:send("10.0.1.1", 9000, "datagram", { sourcePort = 8000 }))
+equal(select(2, router:pump(0)), "forwarded")
+local datagram = assert(rightUDP:receive(9000, 0.01))
+equal(datagram.payload, "datagram")
+equal(datagram.srcPort, 8000)
 
 -- A single router can own an address on each of two modem interfaces.
 wire = {}
@@ -223,6 +231,8 @@ local ccLink = CCLink.new(nil, { address = "10.0.0.1", port = 4660 })
 assert(ccLink:send("10.0.0.2", "frame"))
 equal(transmission[1], 4660)
 equal(transmission[3].target, "10.0.0.2")
+assert(ccLink:send("255.255.255.255", "broadcast"))
+equal(transmission[3].target, nil)
 os.pullEvent = function()
   return "modem_message", "left", 4660, 4660,
     { marker = "ducknet:1", source = "10.0.0.2", target = "10.0.0.1", frame = "reply" }, 4

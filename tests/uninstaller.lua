@@ -7,6 +7,7 @@ local files = {
   ["/ducknet/bin/serve.lua"] = "program",
   ["/ducknet/bin/uninstall-ducknet.lua"] = "program",
   ["/startup/00-ducknet-path.lua"] = "path startup",
+  ["/startup/10-ducknet-dhcp.lua"] = "dhcp startup",
   ["/startup/ducknet-server.lua"] = "startup",
   ["/etc/ducknet/config.lua"] = "config"
 }
@@ -39,6 +40,7 @@ assert(loadfile(uninstallerPath))()
 assert(not files["/ducknet/lib/ducknet/codec.lua"] and not files["/ducknet/bin/ping.lua"])
 assert(not files["/startup/ducknet-server.lua"])
 assert(not files["/startup/00-ducknet-path.lua"])
+assert(not files["/startup/10-ducknet-dhcp.lua"])
 assert(not shellPath:find("/ducknet/bin", 1, true))
 assert(files["/etc/ducknet/config.lua"], "configuration should be preserved after 'no'")
 
