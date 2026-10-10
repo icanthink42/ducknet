@@ -41,6 +41,7 @@ jobs:
         run: |
           lua tests/run.lua .
           lua tests/ip_command.lua .
+          lua tests/player_tracker.lua .
 
       - name: Build self-contained installer
         run: |

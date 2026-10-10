@@ -8,6 +8,7 @@ local ICMP = require("ducknet.icmp")
 local TCP = require("ducknet.tcp")
 local DLTP = require("ducknet.dltp")
 local Sandbox = require("niobium.sandbox")
+local UI = require("niobium.ui")
 
 local function equal(left, right, message)
   assert(left == right, (message or "values differ") .. ": " .. tostring(left) .. " ~= " .. tostring(right))
@@ -189,6 +190,8 @@ assert(sandbox:run([[local ui=require("ui"); ui.write(string.upper("safe"))]], {
   ui = { write = function(value) output[#output + 1] = value end }
 }))
 equal(output[1], "SAFE")
+local prompted = UI.new(nil, nil, { reader = function() return "Steve" end }):capability()
+equal(prompted.input(""), "Steve")
 local ok = sandbox:run([[require("component")]])
 assert(not ok)
 local quotaOk = sandbox:run([[while true do end]])

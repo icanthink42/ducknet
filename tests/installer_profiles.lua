@@ -81,9 +81,11 @@ assert(router["/startup/ducknet-router.lua"], "router startup was not installed"
 assert(load(router["/startup/ducknet-router.lua"], "=router-startup"))
 assert(router["/startup/ducknet-router.lua"]:find("/ducknet/bin/router.lua", 1, true))
 
-local server = runProfile("server", { "", "server", "", "", "", "", "", "", "1" })
+local server = runProfile("server", { "", "server", "", "", "", "", "", "", "3" })
 assert(server["/ducknet/bin/serve.lua"], "server runtime was not installed")
-assert(server["/etc/ducknet/site.lua"]:find("DuckNet Foo Bar Test", 1, true))
+assert(server["/etc/ducknet/site.lua"]:find("DuckNet Player Tracker", 1, true))
+assert(server["/ducknet/share/sites/foo-bar.lua"], "Foo Bar site was not bundled")
+assert(server["/ducknet/share/sites/player-tracker.lua"], "Player Tracker site was not bundled")
 assert(server["/startup/ducknet-server.lua"], "server startup was not installed")
 assert(load(server["/startup/ducknet-server.lua"], "=server-startup"))
 assert(server["/startup/ducknet-server.lua"]:find("/ducknet/bin/serve.lua", 1, true))

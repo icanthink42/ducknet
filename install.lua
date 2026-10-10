@@ -35,6 +35,7 @@ local packages = {
     { "ducknet/bin/duckserve.lua", "/usr/bin/serve.lua" },
     { "examples/server.lua", "/usr/share/ducknet/server.lua" },
     { "sites/foo-bar.lua", "/usr/share/ducknet/sites/foo-bar.lua" },
+    { "sites/player-tracker.lua", "/usr/share/ducknet/sites/player-tracker.lua" },
     { "examples/server.lua", "/usr/share/ducknet/sites/hello-world.lua" }
   },
   router = {
@@ -420,14 +421,17 @@ local function configureSite()
   io.write("\nWebsites:\n")
   io.write("  1. Foo Bar network test\n")
   io.write("  2. Hello World\n")
-  io.write("  3. GitHub URL\n")
+  io.write("  3. Player Tracker (Advanced Peripherals)\n")
+  io.write("  4. GitHub URL\n")
   local choice = ask("Website", "1")
   local body
   if choice == "1" or choice:lower() == "foo-bar" then
     body = readFile(destinationForPlatform("/usr/share/ducknet/sites/foo-bar.lua"))
   elseif choice == "2" or choice:lower() == "hello-world" then
     body = readFile(destinationForPlatform("/usr/share/ducknet/sites/hello-world.lua"))
-  elseif choice == "3" or choice:lower() == "github" then
+  elseif choice == "3" or choice:lower() == "player-tracker" then
+    body = readFile(destinationForPlatform("/usr/share/ducknet/sites/player-tracker.lua"))
+  elseif choice == "4" or choice:lower() == "github" then
     local url = githubRawUrl(ask("GitHub raw or blob URL"))
     assert(url:match("^https://"), "website URL must use HTTPS")
     local reason

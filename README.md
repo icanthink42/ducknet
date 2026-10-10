@@ -47,12 +47,21 @@ The installer provides these profiles:
 Client, router, and server profiles guide you through network configuration.
 The router profile configures two interfaces by default. Each interface has its
 own modem, IP address, subnet, and channel, so one router can join two subnets.
-The server profile can activate the bundled Foo Bar test or Hello World site,
-or download a DuckNet server application from a GitHub raw/blob URL. Start a
+The server profile can activate the bundled Foo Bar test, Hello World site, or
+interactive Player Tracker, or download a DuckNet server application from a
+GitHub raw/blob URL. Start a
 configured server with `serve /etc/ducknet/site.lua`, or a router with
 `router`. Router and server profiles also install and enable the matching
 startup service automatically. Rebooting the computer resumes its configured
 role without another command.
+
+The Player Tracker site requires an Advanced Peripherals Player Detector
+attached to the server computer. Open it in Niobium, enter an online Minecraft
+username, and it requests the player's coordinates and available detector
+metadata from the server. The site supports both `player_detector`/`getPlayer`
+and legacy `playerDetector`/`getPlayerPos` APIs. It exposes player locations to
+every client that can reach the site, so deploy it only on a network where that
+is intended.
 
 Every push to `main` is tested and published automatically. The release pipeline
 increments the latest semantic patch version, tags the tested commit, builds the
