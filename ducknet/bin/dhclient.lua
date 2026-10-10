@@ -118,6 +118,38 @@ local function acquire(settings, path, modemName, channel)
     " via " .. lease.gateway .. " for " .. lease.lease .. " seconds\n")
 end
 
+local function configure(settings, path, modemName, channel)
+  local id = clientId(settings)
+  settings.link = settings.link or {}
+  settings.ip = settings.ip or {}
+  settings.link.modem = modemName
+  settings.link.port = channel
+  settings.ip.address = "0.0.0.0"
+  settings.routes = {}
+  settings.dhcp = settings.dhcp or {}
+  settings.dhcp.client = {
+    enabled = true, id = id, modem = modemName, channel = channel
+  }
+  assert(config.save(settings, path))
+  installStartup(path)
+  return settings
+end
+
+if action == "configure" then
+  local modemName = arguments[2]
+  if not modemName then
+    error("usage: dhclient configure <modem-side> [channel] [config.lua]", 0)
+  end
+  local channel = tonumber(arguments[3] or "4660")
+  assert(channel and channel % 1 == 0 and channel >= 0 and channel <= 65535,
+    "channel must be between 0 and 65535")
+  local settings, path = load(arguments[4])
+  configure(settings, path, modemName, channel)
+  io.write("configured DHCP on " .. modemName ..
+    "; the client will acquire an address at startup\n")
+  return
+end
+
 if action == "enable" then
   local modemName = arguments[2]
   if not modemName then error("usage: dhclient enable <modem-side> [channel] [config.lua]", 0) end
@@ -125,6 +157,7 @@ if action == "enable" then
   assert(channel and channel % 1 == 0 and channel >= 0 and channel <= 65535,
     "channel must be between 0 and 65535")
   local settings, path = load(arguments[4])
+  settings = configure(settings, path, modemName, channel)
   acquire(settings, path, modemName, channel)
   return
 end
@@ -194,4 +227,4 @@ if action == "release" then
   return
 end
 
-error("usage: dhclient enable|renew|status|release", 0)
+error("usage: dhclient configure|enable|renew|status|release", 0)

@@ -301,60 +301,154 @@ local function defaultSubnet(address)
   return "10.0.0.0/24"
 end
 
-local function defaultRouterAddress(index)
-  return tostring(9 + index) .. ".0.0.1"
+local function ipv4(value)
+  local first, second, third, fourth =
+    tostring(value):match("^(%d+)%.(%d+)%.(%d+)%.(%d+)$")
+  first, second, third, fourth = tonumber(first), tonumber(second),
+    tonumber(third), tonumber(fourth)
+  assert(first and first <= 255 and second <= 255 and third <= 255 and fourth <= 255,
+    "invalid IPv4 address: " .. tostring(value))
+  return ((first * 256 + second) * 256 + third) * 256 + fourth
+end
+
+local function formatIPv4(value)
+  local fourth = value % 256
+  value = math.floor(value / 256)
+  local third = value % 256
+  value = math.floor(value / 256)
+  local second = value % 256
+  local first = math.floor(value / 256)
+  return string.format("%d.%d.%d.%d", first, second, third, fourth)
+end
+
+local function subnetInfo(cidr, minimumHosts)
+  local value, prefix = tostring(cidr):match("^([^/]+)/(%d+)$")
+  prefix = tonumber(prefix)
+  assert(value and prefix and prefix >= 0 and prefix <= 32,
+    "subnet must use IPv4 CIDR notation")
+  local block = 2 ^ (32 - prefix)
+  if minimumHosts then
+    assert(prefix <= 30 and block - 2 >= minimumHosts,
+      "subnet does not have enough usable addresses")
+  end
+  local base = math.floor(ipv4(value) / block) * block
+  return {
+    cidr = formatIPv4(base) .. "/" .. prefix,
+    prefix = prefix, base = base, block = block,
+    first = minimumHosts and formatIPv4(base + 1) or nil,
+    second = minimumHosts and formatIPv4(base + 2) or nil,
+    last = minimumHosts and formatIPv4(base + block - 2) or nil
+  }
+end
+
+local function overlaps(left, right)
+  return left.base < right.base + right.block and right.base < left.base + left.block
+end
+
+local function coreSubnet(index)
+  return formatIPv4(ipv4("10.255.0.0") + ((index - 1) * 4)) .. "/30"
 end
 
 local function configureNetwork(role)
   if hadConfig and not yes("Replace the existing DuckNet configuration", false) then
     io.write("keep " .. configPath .. "\n")
-    return
+    return false
   end
   io.write("\nConfigure the " .. role .. "\n")
-  local defaultHost = 2
-  if role == "router" then defaultHost = 1
-  elseif role == "server" then defaultHost = 10
-  elseif isComputerCraft and os.getComputerID then defaultHost = os.getComputerID() % 240 + 11 end
-  local address = ask("DuckNet IP address", "10.0.0." .. defaultHost)
-  local channel = number("Modem channel", 4660, 0, 65535)
-  local ttl = number("Default TTL", 16, 1, 255)
-  local subnet = ask("Subnet", defaultSubnet(address))
-  local dltpPort = number("DLTP port", role == "server" and 80 or 80, 1, 65535)
-  local routes, interfaces = {}, nil
+  local address, channel, subnet
+  local routes, interfaces, dhcpPools = {}, nil, {}
+  local ttl, dltpPort
+  local routerKind, clientDHCP
 
-  if role ~= "router" then
+  if role == "client" then
+    local modem = ask("Modem side or component address", "left")
+    channel = number("Modem channel", 4660, 0, 65535)
+    ttl = number("Default TTL", 16, 1, 255)
+    dltpPort = number("DLTP port", 80, 1, 65535)
+    address = "0.0.0.0"
+    clientDHCP = { modem = modem, channel = channel }
+  elseif role ~= "router" then
+    local defaultHost = role == "server" and 10 or 2
+    address = ask("DuckNet IP address", "10.0.0." .. defaultHost)
+    channel = number("Modem channel", 4660, 0, 65535)
+    ttl = number("Default TTL", 16, 1, 255)
+    subnet = ask("Subnet", defaultSubnet(address))
+    dltpPort = number("DLTP port", 80, 1, 65535)
     routes[1] = { network = subnet, metric = 10 }
     local gateway = ask("Default gateway (blank for none)", "")
     if gateway ~= "" then
       routes[#routes + 1] = { network = "0.0.0.0/0", via = gateway, metric = 100 }
     end
   else
-    interfaces = {
-      { name = "net1", modem = ask("First modem side or component address", "left"),
-        address = address, port = channel, network = subnet }
-    }
-    while yes("Add another router interface", #interfaces < 2) do
-      local index = #interfaces + 1
-      local interfaceAddress = ask("Interface " .. index .. " DuckNet IP address",
-        defaultRouterAddress(index))
-      interfaces[index] = {
-        name = "net" .. index,
-        address = interfaceAddress,
-        port = number("Interface " .. index .. " modem channel", 4660, 0, 65535),
-        network = ask("Interface " .. index .. " subnet", defaultSubnet(interfaceAddress)),
-        modem = ask("Interface " .. index .. " modem side or component address", "right")
+    routerKind = ask("Router type (home/core)", "home"):lower()
+    assert(routerKind == "home" or routerKind == "core", "router type must be home or core")
+    ttl = number("Default TTL", 16, 1, 255)
+    dltpPort = number("DLTP port", 80, 1, 65535)
+    interfaces = {}
+    if routerKind == "home" then
+      local lanModem = ask("LAN modem side or component address", "left")
+      local lan = subnetInfo(ask("LAN subnet", "11.0.0.0/24"), 2)
+      local lanChannel = number("LAN modem channel", 4660, 0, 65535)
+      interfaces[1] = {
+        name = "lan", modem = lanModem, address = lan.first,
+        port = lanChannel, network = lan.cidr
       }
-    end
-    while yes("Add a static route", false) do
-      local network = ask("Destination network (CIDR)")
-      local nextHop = ask("Next-hop DuckNet IP (blank for direct)", "")
-      routes[#routes + 1] = {
-        network = network,
-        via = nextHop ~= "" and nextHop or nil,
-        interface = ask("Outgoing interface", interfaces[1].name),
-        metric = number("Metric", 100, 0, 65535)
+      if yes("Enable DHCP on the LAN", true) then
+        local firstOffset = lan.block - 2 >= 100 and 100 or 2
+        local lastOffset = lan.block - 2 >= 200 and 200 or lan.block - 2
+        dhcpPools[1] = {
+          interface = "lan", first = formatIPv4(lan.base + firstOffset),
+          last = formatIPv4(lan.base + lastOffset), network = lan.cidr,
+          gateway = lan.first, lease = 3600
+        }
+      end
+      local globalModem = ask("Global modem side or component address", "right")
+      local global = subnetInfo(ask("Global link subnet", "10.255.0.0/30"), 2)
+      assert(not overlaps(lan, global), "LAN and global subnets must not overlap")
+      local globalChannel = number("Global modem channel", 4660, 0, 65535)
+      interfaces[2] = {
+        name = "global", modem = globalModem, address = global.second,
+        port = globalChannel, network = global.cidr
       }
+      routes[1] = {
+        network = "0.0.0.0/0", via = global.first,
+        interface = "global", metric = 100
+      }
+      io.write("Home routing: LAN gateway " .. lan.first .. ", global address " ..
+        global.second .. ", upstream " .. global.first .. "\n")
+    else
+      repeat
+        local index = #interfaces + 1
+        local modem = ask("Link " .. index .. " modem side or component address",
+          index == 1 and "left" or "right")
+        local link = subnetInfo(ask("Link " .. index .. " subnet", coreSubnet(index)), 2)
+        for _, existing in ipairs(interfaces) do
+          assert(not overlaps(link, subnetInfo(existing.network, 2)),
+            "core link subnets must not overlap")
+        end
+        local position = ask("This core uses the first or second address", "first"):lower()
+        assert(position == "first" or position == "second",
+          "address position must be first or second")
+        local localAddress = position == "first" and link.first or link.second
+        local peerAddress = position == "first" and link.second or link.first
+        local name = "link" .. index
+        interfaces[index] = {
+          name = name, modem = modem, address = localAddress,
+          port = number("Link " .. index .. " modem channel", 4660, 0, 65535),
+          network = link.cidr
+        }
+        local remote = ask("Subnet routed through the other router (blank for none)", "")
+        if remote ~= "" then
+          routes[#routes + 1] = {
+            network = subnetInfo(remote).cidr, via = peerAddress,
+            interface = name, metric = 100
+          }
+        end
+        io.write("Core link " .. index .. ": this router " .. localAddress ..
+          ", neighbor " .. peerAddress .. "\n")
+      until not yes("Add another core link", #interfaces < 2)
     end
+    channel = interfaces[1].port
   end
 
   local peers = {}
@@ -376,12 +470,16 @@ local function configureNetwork(role)
     "    broadcastUnknown = false,",
     "    peers = {"
   }
+  if clientDHCP then
+    table.insert(lines, 5, "    modem = " .. quote(clientDHCP.modem) .. ",")
+  end
   for _, peer in ipairs(peers) do
     lines[#lines + 1] = "      [" .. quote(peer.address) .. "] = " .. quote(peer.modem) .. ","
   end
   lines[#lines + 1] = "    }"
   lines[#lines + 1] = "  },"
   if interfaces then
+    lines[#lines + 1] = "  router = { kind = " .. quote(routerKind) .. " },"
     lines[#lines + 1] = "  interfaces = {"
     for _, interface in ipairs(interfaces) do
       lines[#lines + 1] = "    { name = " .. quote(interface.name) ..
@@ -404,11 +502,25 @@ local function configureNetwork(role)
       ", metric = " .. route.metric .. " },"
   end
   lines[#lines + 1] = "  },"
+  if #dhcpPools > 0 then
+    lines[#lines + 1] = "  dhcp = { pools = {"
+    for _, pool in ipairs(dhcpPools) do
+      lines[#lines + 1] = "    { interface = " .. quote(pool.interface) ..
+        ", first = " .. quote(pool.first) .. ", last = " .. quote(pool.last) ..
+        ", network = " .. quote(pool.network) .. ", gateway = " ..
+        quote(pool.gateway) .. ", lease = " .. pool.lease .. " },"
+    end
+    lines[#lines + 1] = "  } },"
+  elseif clientDHCP then
+    lines[#lines + 1] = "  dhcp = { client = { enabled = true, modem = " ..
+      quote(clientDHCP.modem) .. ", channel = " .. clientDHCP.channel .. " } },"
+  end
   lines[#lines + 1] = "  tcp = { mtu = 4096, timeout = 2, retries = 4 },"
   lines[#lines + 1] = "  dltp = { port = " .. dltpPort .. " }"
   lines[#lines + 1] = "}"
   writeAtomic(configPath, table.concat(lines, "\n") .. "\n")
   io.write("configured " .. configPath .. "\n")
+  return { clientDHCP = clientDHCP }
 end
 
 local function githubRawUrl(url)
@@ -504,8 +616,42 @@ local function configureStartup(role)
   io.write("enabled DuckNet " .. role .. " at startup\n")
 end
 
+local function configureClientDHCPStartup()
+  if isComputerCraft then
+    makeDirectory("/startup")
+    local body = [[if multishell then
+  multishell.launch({}, "/ducknet/bin/dhclient.lua", "daemon", "/etc/ducknet/config.lua")
+else
+  print("Acquiring DuckNet DHCP lease...")
+  shell.run("/ducknet/bin/dhclient.lua", "renew", "/etc/ducknet/config.lua")
+end
+]]
+    writeAtomic("/startup/10-ducknet-dhcp.lua", body)
+    return
+  end
+  local body = [[local worker
+function start()
+  if worker and worker:status() == "running" then return end
+  worker = require("thread").create(function()
+    assert(loadfile("/usr/bin/dhclient.lua"))("daemon", "/etc/ducknet/config.lua")
+  end):detach()
+end
+function stop() if worker then worker:kill(); worker = nil end end
+]]
+  writeAtomic("/etc/rc.d/ducknet-dhcp.lua", body)
+  local shell = require("shell")
+  pcall(shell.execute, "rc ducknet-dhcp disable")
+  local enabled, reason = shell.execute("rc ducknet-dhcp enable")
+  assert(enabled, "could not enable DHCP startup service: " .. tostring(reason))
+end
+
+local networkSetup
 if profile == "client" or profile == "router" or profile == "server" then
-  configureNetwork(profile)
+  networkSetup = configureNetwork(profile)
+end
+if profile == "client" and networkSetup and networkSetup.clientDHCP then
+  configureClientDHCPStartup()
+  io.write("enabled DuckNet DHCP at startup\n")
 end
 if profile == "server" then configureSite() end
 if profile == "router" or profile == "server" then configureStartup(profile) end
@@ -517,5 +663,5 @@ if profile == "router" then
 elseif profile == "server" then
   io.write("Start the server with: serve /etc/ducknet/site.lua\n")
 elseif profile == "client" then
-  io.write("Open a site with: niobium dltp://<server-ip>/\n")
+  io.write("Reboot to acquire a DHCP address, then open a site with Niobium.\n")
 end

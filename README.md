@@ -38,15 +38,22 @@ the first argument when testing a fork.
 
 The installer provides these profiles:
 
-- `client`: Niobium, DLTP, TCP/IP, and diagnostic tools
+- `client`: automatic DHCP, Niobium, DLTP, TCP/IP, and diagnostic tools
 - `router`: multi-interface packet forwarding, route configuration, and diagnostic tools
 - `server`: the DLTP server runtime, network configuration, and website setup
 - `developer`: every library, program, example, and bundled website
 - `custom`: manual package selection
 
 Client, router, and server profiles guide you through network configuration.
-The router profile configures two interfaces by default. Each interface has its
-own modem, IP address, subnet, and channel, so one router can join two subnets.
+The client profile only asks for its modem side and channel, enables DHCP, and
+acquires its address, subnet, and gateway automatically when the computer starts.
+The router profile offers topology-aware `home` and `core` setups. A home router
+asks which modem side faces the LAN, which faces the global network, and the
+subnet on each side. It derives the router addresses, installs the default route,
+and can create the LAN DHCP pool automatically. A core router asks for each
+attached link subnet and any subnet routed through the neighboring router; it
+derives both link endpoint addresses and creates the return route. Exact router
+interface addresses no longer need to be entered during normal setup.
 The server profile can activate the bundled Foo Bar test, Hello World site, or
 interactive Player Tracker, or download a DuckNet server application from a
 GitHub raw/blob URL. Start a
@@ -100,6 +107,7 @@ dhcpd pool add <interface> <first> <last> [lease-seconds]
 dhcpd pool remove <interface>          remove an interface's DHCP pool
 dhcpd lease list                       list persistent leases
 dhclient enable <modem> [channel]      acquire an address and enable renewal
+dhclient configure <modem> [channel]   enable DHCP for acquisition at startup
 dhclient renew                         renew the current DHCP lease
 dhclient status                        show the current lease
 dhclient release                       return and disable the current lease
@@ -124,9 +132,11 @@ DISCOVER/OFFER/REQUEST/ACK exchange. On a router, create a pool for a directly
 connected client interface and reboot:
 
 ```text
-dhcpd pool add net11 11.0.0.100 11.0.0.200 3600
+dhcpd pool add lan 11.0.0.100 11.0.0.200 3600
 reboot
 ```
+
+The home-router installer creates this LAN pool automatically by default.
 
 On a client attached through its left modem, acquire a lease:
 
