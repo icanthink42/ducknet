@@ -4,10 +4,17 @@ local arguments = { ... }
 local settings, _, ip, _, stack = cli.load(arguments[1], false)
 
 io.write("DuckNet adapter\n")
+local roles = {}
+for _, configured in ipairs(settings.interfaces or {}) do
+  roles[configured.name] = configured.role
+end
 for index, interface in ipairs(ip.interfaces) do
   local link = interface.link
   io.write(string.format("  Interface %s%s\n", interface.name,
     index == 1 and " (primary)" or ""))
+  if roles[interface.name] then
+    io.write("    Role . . . . . . . : " .. roles[interface.name] .. "\n")
+  end
   io.write("    IP address . . . . : " .. interface.address .. "\n")
   io.write("    Platform . . . . . : " .. tostring(link.platform) .. "\n")
   io.write("    Modem address  . . : " ..

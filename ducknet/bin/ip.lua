@@ -16,6 +16,7 @@ usage:
   ip interface list [config.lua]
   ip interface add <name> <modem> <address/prefix> [channel] [config.lua]
   ip interface set <name> <modem> <address/prefix> [channel] [config.lua]
+  ip interface role <name> <lan|transit> [config.lua]
   ip interface remove <name> [config.lua]
   ip route list [config.lua]
   ip route add <network> <interface> <next-hop|direct> [metric] [config.lua]
@@ -182,18 +183,30 @@ end
 
 if family == "interface" and action == "list" then
   local settings = load(arguments[3])
-  io.write("Name            Modem            Address            Subnet              Channel\n")
+  io.write("Name            Role       Modem            Address            Subnet              Channel\n")
   if settings.interfaces and #settings.interfaces > 0 then
     for _, interface in ipairs(settings.interfaces) do
-      io.write(string.format("%-15s %-16s %-18s %-19s %d\n", interface.name,
-        interface.modem or "auto", interface.address,
+      io.write(string.format("%-15s %-10s %-16s %-18s %-19s %d\n", interface.name,
+        interface.role or "network", interface.modem or "auto", interface.address,
         interface.network or interface.subnet, interface.port or 4660))
     end
   else
-    io.write(string.format("%-15s %-16s %-18s %-19s %d\n", "default", "auto",
-      settings.ip.address, ((settings.routes or {})[1] or {}).network or "unknown",
-      (settings.link or {}).port or 4660))
+    io.write(string.format("%-15s %-10s %-16s %-18s %-19s %d\n", "default",
+      "host", "auto", settings.ip.address,
+      ((settings.routes or {})[1] or {}).network or "unknown", (settings.link or {}).port or 4660))
   end
+  return
+end
+
+if family == "interface" and action == "role" then
+  local name, role = arguments[3], arguments[4] and arguments[4]:lower()
+  if not name or not role then usage() return end
+  assert(role == "lan" or role == "transit", "interface role must be lan or transit")
+  local settings, path = load(arguments[5])
+  local interface = findInterface(settings, name)
+  assert(interface, "unknown interface: " .. name)
+  interface.role = role
+  save(settings, path, "set interface " .. name .. " role to " .. role)
   return
 end
 
@@ -217,7 +230,8 @@ if family == "interface" and (action == "add" or action == "set") then
       "IP address already exists: " .. address)
   end
   local replacement = {
-    name = name, modem = modem, address = address, network = network, port = channel
+    name = name, modem = modem, address = address, network = network, port = channel,
+    role = existing and existing.role or nil
   }
   if existingIndex then settings.interfaces[existingIndex] = replacement
   else settings.interfaces[#settings.interfaces + 1] = replacement end

@@ -345,7 +345,7 @@ local function overlaps(left, right)
   return left.base < right.base + right.block and right.base < left.base + left.block
 end
 
-local function coreSubnet(index)
+local function transitSubnet(index)
   return formatIPv4(ipv4("10.255.0.0") + ((index - 1) * 4)) .. "/30"
 end
 
@@ -358,7 +358,7 @@ local function configureNetwork(role)
   local address, channel, subnet
   local routes, interfaces, dhcpPools = {}, nil, {}
   local ttl, dltpPort
-  local routerKind, clientDHCP
+  local routerPreset, clientDHCP
 
   if role == "client" then
     local modem = ask("Modem side or component address", "left")
@@ -380,63 +380,71 @@ local function configureNetwork(role)
       routes[#routes + 1] = { network = "0.0.0.0/0", via = gateway, metric = 100 }
     end
   else
-    routerKind = ask("Router type (home/core)", "home"):lower()
-    assert(routerKind == "home" or routerKind == "core", "router type must be home or core")
+    routerPreset = ask("Router preset (home/transit)", "home"):lower()
+    assert(routerPreset == "home" or routerPreset == "transit",
+      "router preset must be home or transit")
     ttl = number("Default TTL", 16, 1, 255)
     dltpPort = number("DLTP port", 80, 1, 65535)
     interfaces = {}
-    if routerKind == "home" then
-      local lanModem = ask("LAN modem side or component address", "left")
-      local lan = subnetInfo(ask("LAN subnet", "11.0.0.0/24"), 2)
-      local lanChannel = number("LAN modem channel", 4660, 0, 65535)
-      interfaces[1] = {
-        name = "lan", modem = lanModem, address = lan.first,
-        port = lanChannel, network = lan.cidr
+    local lanCount, transitCount = 0, 0
+
+    local function checkInterfaceSubnet(info)
+      for _, existing in ipairs(interfaces) do
+        assert(not overlaps(info, subnetInfo(existing.network, 2)),
+          "router interface subnets must not overlap")
+      end
+    end
+
+    local function addLAN(defaultModem, defaultNetwork)
+      lanCount = lanCount + 1
+      local name = lanCount == 1 and "lan" or ("lan" .. lanCount)
+      local modem = ask("LAN " .. lanCount .. " modem side or component address", defaultModem)
+      local lan = subnetInfo(ask("LAN " .. lanCount .. " subnet", defaultNetwork), 2)
+      checkInterfaceSubnet(lan)
+      interfaces[#interfaces + 1] = {
+        name = name, role = "lan", modem = modem, address = lan.first,
+        port = number("LAN " .. lanCount .. " modem channel", 4660, 0, 65535),
+        network = lan.cidr
       }
-      if yes("Enable DHCP on the LAN", true) then
+      if yes("Enable DHCP on LAN " .. lanCount, true) then
         local firstOffset = lan.block - 2 >= 100 and 100 or 2
         local lastOffset = lan.block - 2 >= 200 and 200 or lan.block - 2
-        dhcpPools[1] = {
-          interface = "lan", first = formatIPv4(lan.base + firstOffset),
+        dhcpPools[#dhcpPools + 1] = {
+          interface = name, first = formatIPv4(lan.base + firstOffset),
           last = formatIPv4(lan.base + lastOffset), network = lan.cidr,
           gateway = lan.first, lease = 3600
         }
       end
-      local globalModem = ask("Global modem side or component address", "right")
-      local global = subnetInfo(ask("Global link subnet", "10.255.0.0/30"), 2)
-      assert(not overlaps(lan, global), "LAN and global subnets must not overlap")
-      local globalChannel = number("Global modem channel", 4660, 0, 65535)
-      interfaces[2] = {
-        name = "global", modem = globalModem, address = global.second,
-        port = globalChannel, network = global.cidr
+      io.write("LAN " .. lanCount .. ": gateway " .. lan.first ..
+        " on " .. lan.cidr .. "\n")
+    end
+
+    local function addTransit(defaultModem, defaultPosition, askRemote, offerDefault)
+      transitCount = transitCount + 1
+      local name = "transit" .. transitCount
+      local modem = ask("Transit " .. transitCount .. " modem side or component address",
+        defaultModem)
+      local link = subnetInfo(ask("Transit " .. transitCount .. " link subnet",
+        transitSubnet(transitCount)), 2)
+      checkInterfaceSubnet(link)
+      local position = ask("This router uses the first or second address",
+        defaultPosition):lower()
+      assert(position == "first" or position == "second",
+        "address position must be first or second")
+      local localAddress = position == "first" and link.first or link.second
+      local peerAddress = position == "first" and link.second or link.first
+      interfaces[#interfaces + 1] = {
+        name = name, role = "transit", modem = modem, address = localAddress,
+        port = number("Transit " .. transitCount .. " modem channel", 4660, 0, 65535),
+        network = link.cidr
       }
-      routes[1] = {
-        network = "0.0.0.0/0", via = global.first,
-        interface = "global", metric = 100
-      }
-      io.write("Home routing: LAN gateway " .. lan.first .. ", global address " ..
-        global.second .. ", upstream " .. global.first .. "\n")
-    else
-      repeat
-        local index = #interfaces + 1
-        local modem = ask("Link " .. index .. " modem side or component address",
-          index == 1 and "left" or "right")
-        local link = subnetInfo(ask("Link " .. index .. " subnet", coreSubnet(index)), 2)
-        for _, existing in ipairs(interfaces) do
-          assert(not overlaps(link, subnetInfo(existing.network, 2)),
-            "core link subnets must not overlap")
-        end
-        local position = ask("This core uses the first or second address", "first"):lower()
-        assert(position == "first" or position == "second",
-          "address position must be first or second")
-        local localAddress = position == "first" and link.first or link.second
-        local peerAddress = position == "first" and link.second or link.first
-        local name = "link" .. index
-        interfaces[index] = {
-          name = name, modem = modem, address = localAddress,
-          port = number("Link " .. index .. " modem channel", 4660, 0, 65535),
-          network = link.cidr
+      if offerDefault and yes("Use this as the default transit link", transitCount == 1) then
+        routes[#routes + 1] = {
+          network = "0.0.0.0/0", via = peerAddress,
+          interface = name, metric = 100
         }
+      end
+      if askRemote then
         local remote = ask("Subnet routed through the other router (blank for none)", "")
         if remote ~= "" then
           routes[#routes + 1] = {
@@ -444,9 +452,24 @@ local function configureNetwork(role)
             interface = name, metric = 100
           }
         end
-        io.write("Core link " .. index .. ": this router " .. localAddress ..
-          ", neighbor " .. peerAddress .. "\n")
-      until not yes("Add another core link", #interfaces < 2)
+      end
+      io.write("Transit " .. transitCount .. ": this router " .. localAddress ..
+        ", neighbor " .. peerAddress .. "\n")
+    end
+
+    if routerPreset == "home" then
+      addLAN("left", "11.0.0.0/24")
+      addTransit("right", "second", false, true)
+      while yes("Add another transit link", false) do
+        addTransit("back", "second", false, true)
+      end
+    else
+      repeat
+        addTransit(transitCount == 0 and "left" or "right", "first", true, false)
+      until not yes("Add another transit link", transitCount < 2)
+      while yes("Add a LAN to this router", false) do
+        addLAN("back", "11.0.0.0/24")
+      end
     end
     channel = interfaces[1].port
   end
@@ -479,10 +502,11 @@ local function configureNetwork(role)
   lines[#lines + 1] = "    }"
   lines[#lines + 1] = "  },"
   if interfaces then
-    lines[#lines + 1] = "  router = { kind = " .. quote(routerKind) .. " },"
+    lines[#lines + 1] = "  router = { preset = " .. quote(routerPreset) .. " },"
     lines[#lines + 1] = "  interfaces = {"
     for _, interface in ipairs(interfaces) do
       lines[#lines + 1] = "    { name = " .. quote(interface.name) ..
+        ", role = " .. quote(interface.role) ..
         ", modem = " .. quote(interface.modem) ..
         ", address = " .. quote(interface.address) ..
         ", network = " .. quote(interface.network) ..

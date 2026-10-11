@@ -71,24 +71,26 @@ assert(client["/startup/10-ducknet-dhcp.lua"], "client did not enable DHCP start
 
 local router = runProfile("router", {
   "", "router", "home", "", "", "left", "11.0.0.0/24", "", "",
-  "right", "10.255.0.0/30", ""
+  "right", "10.255.0.0/30", "", "", "", ""
 })
 assert(router["/ducknet/bin/router.lua"], "router runtime was not installed")
 assert(router["/etc/ducknet/config.lua"]:find("forwarding = true", 1, true))
 local routerConfig = assert(load(router["/etc/ducknet/config.lua"], "=router-config"))()
 assert(#routerConfig.interfaces == 2, "router did not configure two interfaces")
-assert(routerConfig.router.kind == "home")
+assert(routerConfig.router.preset == "home")
 assert(routerConfig.interfaces[1].name == "lan")
+assert(routerConfig.interfaces[1].role == "lan")
 assert(routerConfig.interfaces[1].address == "11.0.0.1")
 assert(routerConfig.interfaces[1].network == "11.0.0.0/24")
 assert(routerConfig.interfaces[1].modem == "left")
-assert(routerConfig.interfaces[2].name == "global")
+assert(routerConfig.interfaces[2].name == "transit1")
+assert(routerConfig.interfaces[2].role == "transit")
 assert(routerConfig.interfaces[2].address == "10.255.0.2")
 assert(routerConfig.interfaces[2].network == "10.255.0.0/30")
 assert(routerConfig.interfaces[2].modem == "right")
 assert(routerConfig.routes[1].network == "0.0.0.0/0")
 assert(routerConfig.routes[1].via == "10.255.0.1")
-assert(routerConfig.routes[1].interface == "global")
+assert(routerConfig.routes[1].interface == "transit1")
 assert(routerConfig.dhcp.pools[1].interface == "lan")
 assert(routerConfig.dhcp.pools[1].first == "11.0.0.100")
 assert(routerConfig.dhcp.pools[1].last == "11.0.0.200")
@@ -96,17 +98,21 @@ assert(router["/startup/ducknet-router.lua"], "router startup was not installed"
 assert(load(router["/startup/ducknet-router.lua"], "=router-startup"))
 assert(router["/startup/ducknet-router.lua"]:find("/ducknet/bin/router.lua", 1, true))
 
-local core = runProfile("router", {
-  "", "router", "core", "", "", "left", "10.255.0.0/30", "first", "",
-  "", "", "right", "10.255.0.4/30", "second", "", "11.0.0.0/24", "n"
+local transit = runProfile("router", {
+  "", "router", "transit", "", "", "left", "10.255.0.0/30", "first", "",
+  "", "", "right", "10.255.0.4/30", "second", "", "11.0.0.0/24", "n",
+  "y", "back", "12.0.0.0/24", "", "n", "n"
 })
-local coreConfig = assert(load(core["/etc/ducknet/config.lua"], "=core-config"))()
-assert(coreConfig.router.kind == "core")
-assert(coreConfig.interfaces[1].address == "10.255.0.1")
-assert(coreConfig.interfaces[2].address == "10.255.0.6")
-assert(coreConfig.routes[1].network == "11.0.0.0/24")
-assert(coreConfig.routes[1].via == "10.255.0.5")
-assert(coreConfig.routes[1].interface == "link2")
+local transitConfig = assert(load(transit["/etc/ducknet/config.lua"], "=transit-config"))()
+assert(transitConfig.router.preset == "transit")
+assert(transitConfig.interfaces[1].role == "transit")
+assert(transitConfig.interfaces[1].address == "10.255.0.1")
+assert(transitConfig.interfaces[2].address == "10.255.0.6")
+assert(transitConfig.interfaces[3].role == "lan")
+assert(transitConfig.interfaces[3].address == "12.0.0.1")
+assert(transitConfig.routes[1].network == "11.0.0.0/24")
+assert(transitConfig.routes[1].via == "10.255.0.5")
+assert(transitConfig.routes[1].interface == "transit2")
 
 local server = runProfile("server", { "", "server", "", "", "", "", "", "", "3" })
 assert(server["/ducknet/bin/serve.lua"], "server runtime was not installed")

@@ -47,13 +47,19 @@ The installer provides these profiles:
 Client, router, and server profiles guide you through network configuration.
 The client profile only asks for its modem side and channel, enables DHCP, and
 acquires its address, subnet, and gateway automatically when the computer starts.
-The router profile offers topology-aware `home` and `core` setups. A home router
-asks which modem side faces the LAN, which faces the global network, and the
-subnet on each side. It derives the router addresses, installs the default route,
-and can create the LAN DHCP pool automatically. A core router asks for each
-attached link subnet and any subnet routed through the neighboring router; it
-derives both link endpoint addresses and creates the return route. Exact router
-interface addresses no longer need to be entered during normal setup.
+Every router runs the same forwarding software and gives each interface a role:
+`lan` for client/server networks or `transit` for links to other routers. The
+`home` preset creates one LAN and one or more transit links; the `transit` preset
+creates a router for the backbone web and can optionally attach LANs too. LAN
+interfaces can run DHCP automatically. Transit links derive both endpoint
+addresses from their link subnet, so exact router addresses do not need to be
+entered during normal setup. The presets describe topology rather than different
+kinds of router.
+Interface roles are persisted for the upcoming dynamic-routing service. In this
+release, connected routes are automatic but routes through neighboring routers
+are still static; the transit preset can create those neighbor routes during
+setup. Automatic route advertisement and failover are the next routing-layer
+step.
 The server profile can activate the bundled Foo Bar test, Hello World site, or
 interactive Player Tracker, or download a DuckNet server application from a
 GitHub raw/blob URL. Start a
@@ -96,6 +102,7 @@ ip interface add <name> <modem> <cidr> [channel]
                                         persist a new router interface
 ip interface set <name> <modem> <cidr> [channel]
                                         replace an interface's configuration
+ip interface role <name> <lan|transit>  set an interface's topology role
 ip interface remove <name>              remove a router interface
 ip route list                           list persistent routes
 ip route add <cidr> <interface> <via|direct> [metric]
@@ -159,9 +166,9 @@ network.
 return {
   link = { broadcastUnknown = false, peers = {} },
   interfaces = {
-    { name = "net10", modem = "left", address = "10.0.0.1",
+    { name = "net10", role = "lan", modem = "left", address = "10.0.0.1",
       network = "10.0.0.0/24", port = 4660 },
-    { name = "net11", modem = "right", address = "11.0.0.1",
+    { name = "net11", role = "lan", modem = "right", address = "11.0.0.1",
       network = "11.0.0.0/24", port = 4660 },
   },
   ip = { forwarding = true, ttl = 16 },
