@@ -2,7 +2,6 @@ local root = (... and ... ~= "" and ...) or "."
 local originalFs, originalParallel = _G.fs, _G.parallel
 local originalQueueEvent, originalPullEvent, originalStartTimer =
   os.queueEvent, os.pullEvent, os.startTimer
-local originalRun = os.run
 local originalConfig = package.loaded["ducknet.config"]
 local records, events = {}, {}
 
@@ -106,10 +105,10 @@ program("boot")
 assert(records["/var/run/systemdck/demo.lua"].state == "starting")
 assert(records["/var/run/systemdck/demo.lua"].worker == 1)
 _G.parallel.waitForAny = function(run) run() return 1 end
-os.run = function(environment, path, argument)
+programEnvironment.loadfile = function(path, mode, environment)
   serviceEnvironment = environment
-  assert(path == "/test.lua" and argument == "one")
-  return true
+  assert(path == "/test.lua" and mode == nil)
+  return function(argument) assert(argument == "one") return true end
 end
 local worker = coroutine.create(bootTasks[3])
 assert(coroutine.resume(worker))
@@ -122,10 +121,10 @@ assert(records["/var/run/systemdck/demo.lua"].state == "inactive")
 local source = assert(io.open(root .. "/ducknet/bin/systemdck.lua", "r")):read("*a")
 assert(source:find("parallel.waitForAll", 1, true))
 assert(not source:find("multishell", 1, true))
+assert(not source:find("os.run", 1, true))
 
 _G.fs, _G.parallel = originalFs, originalParallel
 os.queueEvent, os.pullEvent, os.startTimer =
   originalQueueEvent, originalPullEvent, originalStartTimer
-os.run = originalRun
 package.loaded["ducknet.config"] = originalConfig
 io.write("all systemdck tests passed\n")

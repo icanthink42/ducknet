@@ -209,10 +209,16 @@ local function runSupervisor()
           appendLog(name, "[systemdck] starting at " .. tostring(timestamp()) .. "\n")
           local success, message, controlled
           parallel.waitForAny(function()
-            local ok, result = pcall(os.run, serviceEnvironment(name), unit.program,
-              unpack(unit.arguments or {}))
+            local program, loadError = loadfile(unit.program, nil, serviceEnvironment(name))
+            if not program then
+              success, message = false, tostring(loadError)
+              appendLog(name, "ERROR: " .. message .. "\n")
+              return
+            end
+            local ok, result = pcall(program, unpack(unit.arguments or {}))
             success = ok and result ~= false
             message = success and "program exited" or tostring(ok and "program failed" or result)
+            if not success then appendLog(name, "ERROR: " .. message .. "\n") end
           end, function()
             while true do
               local _, target = os.pullEvent("systemdck_control")
