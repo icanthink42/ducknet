@@ -1,7 +1,7 @@
 local root = (... and ... ~= "" and ...) or "."
 package.path = root .. "/ducknet/lib/?.lua;" .. root .. "/ducknet/lib/?/init.lua;" .. package.path
-local originalFs, originalParallel, originalTerm, originalColors, originalShell =
-  _G.fs, _G.parallel, _G.term, _G.colors, _G.shell
+local originalFs, originalParallel, originalTerm, originalColors, originalShell, originalKeys =
+  _G.fs, _G.parallel, _G.term, _G.colors, _G.shell, _G.keys
 local originalQueueEvent, originalPullEvent, originalStartTimer =
   os.queueEvent, os.pullEvent, os.startTimer
 local originalPullEventRaw = os.pullEventRaw
@@ -59,6 +59,10 @@ _G.fs = {
 }
 _G.parallel = {}
 _G.colors = { white = 1, black = 32768 }
+_G.keys = {
+  pageUp = 266, pageDown = 267, home = 268, ["end"] = 269,
+  numPad1 = 321, numPad3 = 323, numPad7 = 327, numPad9 = 329
+}
 local terminalRows, terminalCursor, redirected = {}, { 1, 1 }
 local nativeTerminal = {
   getSize = function() return 12, 4 end,
@@ -166,9 +170,10 @@ assert(type(serviceEnvironment.require) == "function")
 assert(serviceEnvironment._G == serviceEnvironment)
 assert(records["/var/run/systemdck/demo.lua"].state == "inactive")
 
--- Scroll events are processed inside the foreground shell scheduler before
--- they are forwarded to CraftOS, so the retained terminal is always redrawn.
-local rawEvents = { { "mouse_scroll", -1 } }
+-- Keypad navigation is processed inside the foreground shell scheduler before
+-- it is forwarded to CraftOS. Some keyboards report their Page Up key as
+-- numPad9, including the layout used by the in-game test computer.
+local rawEvents = { { "key", 329, false } }
 os.pullEventRaw = function()
   local nextEvent = table.remove(rawEvents, 1)
   if not nextEvent then return coroutine.yield() end
@@ -177,7 +182,7 @@ end
 local interactive = coroutine.create(bootTasks[2])
 assert(coroutine.resume(interactive))
 assert(coroutine.status(interactive) == "suspended")
-assert(terminalRows[1]:match("line 5"), "mouse wheel did not reveal retained output")
+assert(terminalRows[1]:match("line 4"), "keypad Page Up did not reveal retained output")
 
 -- Ctrl+T reaches the foreground shell, but background environments and the
 -- supervisor ignore the broadcast terminate event.
@@ -203,7 +208,7 @@ assert(not source:find("multishell", 1, true))
 assert(not source:find("os.run", 1, true))
 
 _G.fs, _G.parallel = originalFs, originalParallel
-_G.term, _G.colors, _G.shell = originalTerm, originalColors, originalShell
+_G.term, _G.colors, _G.shell, _G.keys = originalTerm, originalColors, originalShell, originalKeys
 os.queueEvent, os.pullEvent, os.startTimer =
   originalQueueEvent, originalPullEvent, originalStartTimer
 os.pullEventRaw = originalPullEventRaw

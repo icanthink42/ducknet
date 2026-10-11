@@ -292,16 +292,16 @@ local function runSupervisor()
         elseif event[1] == "term_resize" then
           console:resize()
         elseif event[1] == "key" and type(keys) == "table" then
-          if event[2] == keys.pageUp then
+          if event[2] == keys.pageUp or event[2] == keys.numPad9 then
             console:view(math.max(1, math.floor(console.height / 2)))
             forward = false
-          elseif event[2] == keys.pageDown then
+          elseif event[2] == keys.pageDown or event[2] == keys.numPad3 then
             console:view(-math.max(1, math.floor(console.height / 2)))
             forward = false
-          elseif event[2] == keys.home then
+          elseif event[2] == keys.home or event[2] == keys.numPad7 then
             console:view(1000)
             forward = false
-          elseif event[2] == keys["end"] then
+          elseif event[2] == keys["end"] or event[2] == keys.numPad1 then
             console:follow()
             forward = false
           else
