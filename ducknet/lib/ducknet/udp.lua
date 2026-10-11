@@ -6,7 +6,8 @@ UDP.PROTOCOL = 17
 
 function UDP.new(ip)
   local self = setmetatable({
-    ip = ip, queues = {}, handlers = {}, bound = {}, nextPort = 49152
+    ip = ip, queues = {}, handlers = {}, bound = {}, nextPort = 49152,
+    onError = nil
   }, UDP)
   ip:on(self.PROTOCOL, function(packet)
     local ok, datagram = pcall(codec.decode, packet.payload)
@@ -18,6 +19,7 @@ function UDP.new(ip)
     for _, handler in ipairs(handlers) do
       local handled, consumed = pcall(handler, datagram, packet)
       if handled and consumed then return true end
+      if not handled and self.onError then pcall(self.onError, consumed, datagram) end
     end
     if not self.bound[datagram.dstPort] then return true end
     local queue = self.queues[datagram.dstPort] or {}

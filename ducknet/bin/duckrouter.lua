@@ -6,8 +6,14 @@ local settings, configError = config.load(arguments[1])
 if not settings then error("could not load config: " .. tostring(configError), 0) end
 settings.ip.forwarding = true
 local stack = ducknet.stack(settings)
+stack.udp.onError = function(message)
+  io.stderr:write("DuckNet UDP handler error: " .. tostring(message) .. "\n")
+end
 local dhcpServer
 if settings.dhcp and settings.dhcp.pools and #settings.dhcp.pools > 0 then
+  settings.dhcp.log = function(message)
+    io.write("DHCP: " .. message .. "\n")
+  end
   local ok, serverOrError = pcall(ducknet.DHCP.server, stack.udp, stack.ip, settings.dhcp)
   if ok then
     dhcpServer = serverOrError

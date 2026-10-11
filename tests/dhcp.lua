@@ -4,6 +4,8 @@ package.path = root .. "/ducknet/lib/?.lua;" ..
 
 local DHCP = require("ducknet.dhcp")
 local config = require("ducknet.config")
+local IP = require("ducknet.ip")
+local UDP = require("ducknet.udp")
 local leasePath = os.tmpname()
 os.remove(leasePath)
 
@@ -26,8 +28,10 @@ local ip = {
   }
 }
 local clock = 1000
+local serverLog = {}
 local server = DHCP.server(udp, ip, {
   leasePath = leasePath, clock = function() return clock end,
+  log = function(message) serverLog[#serverLog + 1] = message end,
   pools = {
     { interface = "lan", first = "11.0.0.100", last = "11.0.0.101",
       network = "11.0.0.0/24", gateway = "11.0.0.1", lease = 3600 }
@@ -48,6 +52,7 @@ handler({ interface = "lan", payload = DHCP._encode({
 local ack = DHCP._decode(sent[#sent].payload)
 assert(ack.type == "ack" and ack.address == "11.0.0.100")
 assert(server.leases["11.0.0.100"].clientId == "cc:2")
+assert(serverLog[1]:match("DISCOVER") and serverLog[#serverLog]:match("ACK"))
 
 -- Exercise the client DORA state machine with a deterministic fake transport.
 local pending, phase
@@ -75,6 +80,69 @@ function clientUDP:receive(_, _, predicate)
 end
 local lease = assert(DHCP.Client.acquire(clientUDP, "cc:3", { retries = 1 }))
 assert(phase == "ack" and lease.address == "11.0.0.101")
+
+-- Exercise DORA through real UDP and IP layers on a multi-interface router.
+local endpoints = {}
+local function networkLink(name, segment)
+  local result = { name = name, segment = segment, queue = {} }
+  endpoints[#endpoints + 1] = result
+  function result:send(_, frame)
+    for _, endpoint in ipairs(endpoints) do
+      if endpoint ~= self and endpoint.segment == self.segment then
+        endpoint.queue[#endpoint.queue + 1] = { from = self.name, frame = frame }
+      end
+    end
+    return true
+  end
+  function result:receive()
+    local item = table.remove(self.queue, 1)
+    if item then return item.from, item.frame end
+    return nil, "timeout"
+  end
+  function result:receiveAny(links)
+    for _, link in ipairs(links) do
+      local item = table.remove(link.queue, 1)
+      if item then return item.from, item.frame, link end
+    end
+    return nil, "timeout"
+  end
+  return result
+end
+
+local clientIP = IP.new(networkLink("client", "lan"), {
+  address = "0.0.0.0", clock = os.clock
+})
+local routerIP = IP.new(networkLink("router-lan", "lan"), {
+  address = "10.0.0.1", interface = "lan", forwarding = true, clock = os.clock
+})
+routerIP:addInterface(networkLink("router-transit", "transit"), {
+  name = "transit1", address = "10.255.0.2"
+})
+routerIP:addRoute("10.0.0.0/16", nil, 10, "lan")
+routerIP:addRoute("10.255.0.0/30", nil, 10, "transit1")
+local clientDatagrams, routerDatagrams = UDP.new(clientIP), UDP.new(routerIP)
+local integrationLeasePath = os.tmpname()
+os.remove(integrationLeasePath)
+DHCP.server(routerDatagrams, routerIP, {
+  leasePath = integrationLeasePath, clock = function() return 2000 end,
+  pools = {{ interface = "lan", first = "10.0.0.100", last = "10.0.0.200",
+    network = "10.0.0.0/16", gateway = "10.0.0.1", lease = 3600 }}
+})
+local integrationXid = "integration-xid"
+assert(clientDatagrams:send(DHCP.BROADCAST, DHCP.SERVER_PORT, DHCP._encode({
+  type = "discover", xid = integrationXid, clientId = "cc:4"
+}), { sourcePort = DHCP.CLIENT_PORT, source = "0.0.0.0", interface = "default" }))
+assert(routerIP:pump(0))
+local offeredDatagram = assert(clientDatagrams:receive(DHCP.CLIENT_PORT, 0.01))
+local integrationOffer = DHCP._decode(offeredDatagram.payload)
+assert(integrationOffer.type == "offer" and integrationOffer.address == "10.0.0.100")
+assert(clientDatagrams:send(DHCP.BROADCAST, DHCP.SERVER_PORT, DHCP._encode({
+  type = "request", xid = integrationXid, clientId = "cc:4",
+  address = integrationOffer.address, server = integrationOffer.server
+}), { sourcePort = DHCP.CLIENT_PORT, source = "0.0.0.0", interface = "default" }))
+assert(routerIP:pump(0))
+local ackDatagram = assert(clientDatagrams:receive(DHCP.CLIENT_PORT, 0.01))
+assert(DHCP._decode(ackDatagram.payload).type == "ack")
 
 local routerPath = os.tmpname()
 os.remove(routerPath)
@@ -108,4 +176,7 @@ os.remove(leasePath .. ".ducknet-old")
 os.remove(routerPath)
 os.remove(routerPath .. ".ducknet-new")
 os.remove(routerPath .. ".ducknet-old")
+os.remove(integrationLeasePath)
+os.remove(integrationLeasePath .. ".ducknet-new")
+os.remove(integrationLeasePath .. ".ducknet-old")
 io.write("all DHCP tests passed\n")
