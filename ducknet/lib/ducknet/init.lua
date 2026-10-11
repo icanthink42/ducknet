@@ -6,6 +6,7 @@ ducknet.IP = require("ducknet.ip")
 ducknet.ICMP = require("ducknet.icmp")
 ducknet.UDP = require("ducknet.udp")
 ducknet.DHCP = require("ducknet.dhcp")
+ducknet.DNS = require("ducknet.dns")
 ducknet.TCP = require("ducknet.tcp")
 ducknet.DLTP = require("ducknet.dltp")
 
@@ -67,10 +68,13 @@ function ducknet.stack(configuration, modem)
   local tcp = ducknet.TCP.new(ip, configuration.tcp)
   local udp = ducknet.UDP.new(ip)
   local icmp = ducknet.ICMP.new(ip)
+  local dnsOptions = configuration.dns or {}
+  local dns = ducknet.DNS.resolver(udp, dnsOptions)
   local dltpOptions = configuration.dltp or {}
   local dltp = ducknet.DLTP.new(tcp, dltpOptions)
   return { link = links[1], links = links, ip = ip, icmp = icmp,
-    udp = udp, tcp = tcp, dltp = dltp }
+    udp = udp, dns = dns, tcp = tcp, dltp = dltp,
+    resolve = function(_, name) return dns:resolve(name) end }
 end
 
 return ducknet

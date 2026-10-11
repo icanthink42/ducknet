@@ -23,6 +23,9 @@ for index, interface in ipairs(ip.interfaces) do
 end
 io.write("  Forwarding . . . . . : " .. (ip.forwarding and "enabled" or "disabled") .. "\n")
 io.write("  Default TTL . . . . . : " .. tostring(ip.defaultTTL) .. "\n")
+local dnsServers = settings.dns and settings.dns.servers or {}
+io.write("  DNS servers . . . . . : " ..
+  (#dnsServers > 0 and table.concat(dnsServers, ", ") or "none") .. "\n")
 local routeCount, peerCount = #ip.routes, 0
 for _, link in ipairs(stack.links) do
   for _ in pairs(link.peers) do peerCount = peerCount + 1 end

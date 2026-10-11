@@ -14,7 +14,11 @@ local host, path = URL.parse(url)
 
 local settings = assert(config.load(arguments[2]))
 local stack = ducknet.stack(settings)
-local response, requestError = stack.dltp:request(host, "GET", path)
+local address, resolveError = stack:resolve(host)
+if not address then error("DNS lookup failed: " .. tostring(resolveError), 0) end
+local response, requestError = stack.dltp:request(address, "GET", path, {
+  headers = { host = host }
+})
 if not response then error("request failed: " .. tostring(requestError), 0) end
 if response.status ~= 200 then error("site returned status " .. tostring(response.status), 0) end
 
@@ -32,7 +36,10 @@ local network = {
   request = function(method, requestedPath, options)
     assert(type(requestedPath) == "string" and requestedPath:sub(1, 1) == "/",
       "sandbox requests must use an absolute same-origin path")
-    return stack.dltp:request(origin, method, requestedPath, options)
+    options = options or {}
+    options.headers = options.headers or {}
+    options.headers.host = origin
+    return stack.dltp:request(address, method, requestedPath, options)
   end
 }
 local sandbox = Sandbox.new()

@@ -18,6 +18,10 @@ return {
     -- { network = "0.0.0.0/0", via = "10.0.0.1", metric = 100 }
   },
   tcp = { mtu = 4096, timeout = 2, retries = 4 },
+  dns = {
+    servers = {},
+    search = {}
+  },
   dltp = {
     port = 80
   }

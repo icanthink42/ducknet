@@ -45,6 +45,8 @@ jobs:
           lua tests/ip_command.lua .
           lua tests/player_tracker.lua .
           lua tests/dhcp.lua .
+          lua tests/dns.lua .
+          lua tests/dns_command.lua .
           lua tests/systemdck.lua .
           lua tests/niobium_command.lua .
 

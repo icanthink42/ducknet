@@ -22,6 +22,7 @@ local packages = {
     { "ducknet/lib/ducknet/icmp.lua", "/usr/lib/ducknet/icmp.lua" },
     { "ducknet/lib/ducknet/udp.lua", "/usr/lib/ducknet/udp.lua" },
     { "ducknet/lib/ducknet/dhcp.lua", "/usr/lib/ducknet/dhcp.lua" },
+    { "ducknet/lib/ducknet/dns.lua", "/usr/lib/ducknet/dns.lua" },
     { "ducknet/lib/ducknet/config.lua", "/usr/lib/ducknet/config.lua" },
     { "ducknet/lib/ducknet/scrollterm.lua", "/usr/lib/ducknet/scrollterm.lua" },
     { "ducknet/etc/ducknet/config.lua", "/etc/ducknet/config.lua", true },
@@ -52,6 +53,11 @@ local packages = {
     { "ducknet/bin/ip.lua", "/usr/bin/ip.lua" },
     { "ducknet/bin/dhclient.lua", "/usr/bin/dhclient.lua" },
     { "ducknet/bin/dhcpd.lua", "/usr/bin/dhcpd.lua" },
+    { "ducknet/bin/dnsd.lua", "/usr/bin/dnsd.lua" },
+    { "ducknet/bin/dnsctl.lua", "/usr/bin/dnsctl.lua" },
+    { "ducknet/bin/dig.lua", "/usr/bin/dig.lua" },
+    { "ducknet/bin/nslookup.lua", "/usr/bin/nslookup.lua" },
+    { "ducknet/bin/host.lua", "/usr/bin/host.lua" },
     { "ducknet/bin/ipconfig.lua", "/usr/bin/ipconfig.lua" },
     { "ducknet/bin/route.lua", "/usr/bin/route.lua" },
     { "ducknet/bin/neighbors.lua", "/usr/bin/arp.lua" },
@@ -545,6 +551,7 @@ local function configureNetwork(role)
       quote(clientDHCP.modem) .. ", channel = " .. clientDHCP.channel .. " } },"
   end
   lines[#lines + 1] = "  tcp = { mtu = 4096, timeout = 2, retries = 4 },"
+  lines[#lines + 1] = "  dns = { servers = {}, search = {} },"
   lines[#lines + 1] = "  dltp = { port = " .. dltpPort .. " }"
   lines[#lines + 1] = "}"
   writeAtomic(configPath, table.concat(lines, "\n") .. "\n")

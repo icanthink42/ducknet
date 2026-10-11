@@ -77,11 +77,17 @@ function Server:addPool(pool)
   local gatewayValue = ipv4(gateway)
   assert(gatewayValue < first or gatewayValue > last,
     "DHCP pool cannot include the gateway address")
+  local dns = {}
+  for _, server in ipairs(pool.dns or {}) do
+    ipv4(server)
+    dns[#dns + 1] = server
+  end
   self.pools[pool.interface] = {
     interface = pool.interface, first = first, last = last,
     network = network, prefix = prefix,
     gateway = gateway,
-    lease = pool.lease or 3600
+    lease = pool.lease or 3600, dns = dns,
+    search = pool.search
   }
 end
 
@@ -141,7 +147,8 @@ function Server:_handle(datagram)
     self:_reply(pool.interface, {
       type = "offer", xid = message.xid, clientId = message.clientId,
       address = offered, prefix = pool.prefix, gateway = pool.gateway,
-      server = self.ip.interfaceByName[pool.interface].address, lease = pool.lease
+      server = self.ip.interfaceByName[pool.interface].address, lease = pool.lease,
+      dns = pool.dns, search = pool.search
     })
     return true
   end
@@ -167,7 +174,7 @@ function Server:_handle(datagram)
       type = "ack", xid = message.xid, clientId = message.clientId,
       address = offer.address, prefix = pool.prefix, gateway = pool.gateway,
       server = self.ip.interfaceByName[pool.interface].address,
-      lease = pool.lease, obtained = self.clock()
+      lease = pool.lease, obtained = self.clock(), dns = pool.dns, search = pool.search
     })
     return true
   end

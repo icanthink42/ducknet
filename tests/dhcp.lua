@@ -32,7 +32,8 @@ local server = DHCP.server(udp, ip, {
   leasePath = leasePath, clock = function() return clock end,
   pools = {
     { interface = "lan", first = "11.0.0.100", last = "11.0.0.101",
-      network = "11.0.0.0/24", gateway = "11.0.0.1", lease = 3600 }
+      network = "11.0.0.0/24", gateway = "11.0.0.1", lease = 3600,
+      dns = { "11.0.0.53" }, search = { "duck" } }
   }
 })
 assert(server and handler)
@@ -43,12 +44,16 @@ handler({ interface = "lan", payload = DHCP._encode({
 local offer = DHCP._decode(sent[#sent].payload)
 assert(offer.type == "offer" and offer.address == "11.0.0.100")
 assert(offer.gateway == "11.0.0.1" and offer.prefix == 24)
+assert(offer.dns[1] == "11.0.0.53")
+assert(offer.search[1] == "duck")
 
 handler({ interface = "lan", payload = DHCP._encode({
   type = "request", xid = "x1", clientId = "cc:2", address = offer.address
 }) })
 local ack = DHCP._decode(sent[#sent].payload)
 assert(ack.type == "ack" and ack.address == "11.0.0.100")
+assert(ack.dns[1] == "11.0.0.53")
+assert(ack.search[1] == "duck")
 assert(server.leases["11.0.0.100"].clientId == "cc:2")
 
 -- Exercise the client DORA state machine with a deterministic fake transport.

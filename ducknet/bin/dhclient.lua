@@ -113,6 +113,11 @@ local function acquire(settings, path, modemName, channel)
     address = lease.address, server = lease.server,
     obtained = lease.obtained, expires = (lease.obtained or 0) + lease.lease
   }
+  if type(lease.dns) == "table" and #lease.dns > 0 then
+    settings.dns = settings.dns or {}
+    settings.dns.servers = lease.dns
+    settings.dns.search = type(lease.search) == "table" and lease.search or {}
+  end
   assert(config.save(settings, path))
   installStartup(path)
   io.write("leased " .. lease.address .. "/" .. lease.prefix ..
@@ -196,6 +201,8 @@ if action == "status" then
   io.write("  Address: " .. tostring(client.address) .. "\n")
   io.write("  Server:  " .. tostring(client.server) .. "\n")
   io.write("  Expires: " .. tostring(client.expires) .. "\n")
+  local servers = settings.dns and settings.dns.servers or {}
+  io.write("  DNS:     " .. (#servers > 0 and table.concat(servers, ", ") or "none") .. "\n")
   return
 end
 

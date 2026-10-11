@@ -15,8 +15,11 @@ package.loaded["ducknet.config"] = {
 }
 package.loaded["ducknet"] = {
   stack = function()
-    return { dltp = { request = function(_, host, method, path)
-      requests[#requests + 1] = { host = host, method = method, path = path }
+    return { resolve = function(_, host) return host end,
+      dltp = { request = function(_, host, method, path, options)
+      requests[#requests + 1] = {
+        host = host, method = method, path = path, options = options
+      }
       return { status = 200, body = "return true" }
     end } }
   end
@@ -55,6 +58,7 @@ run()
 assert(reads == 1)
 assert(table.concat(output) == "DuckNet URL: ")
 assert(requests[1].host == "10.0.0.2" and requests[1].path == "/")
+assert(requests[1].options.headers.host == "10.0.0.2")
 assert(rendered[1][3] == "=dltp://10.0.0.2")
 
 run("10.0.0.3/site", "/custom.lua")

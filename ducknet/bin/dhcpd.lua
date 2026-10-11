@@ -1,4 +1,5 @@
 local config = require("ducknet.config")
+local DNS = require("ducknet.dns")
 
 local arguments = { ... }
 local family, action = arguments[1], arguments[2]
@@ -9,6 +10,8 @@ usage:
   dhcpd pool list [config.lua]
   dhcpd pool add <interface> <first-ip> <last-ip> [lease-seconds] [config.lua]
   dhcpd pool remove <interface> [config.lua]
+  dhcpd pool dns <interface> <ip|none> [additional-ip ...]
+  dhcpd pool search <interface> <domain|none> [additional-domain ...]
   dhcpd lease list [config.lua]
 ]])
 end
@@ -111,6 +114,49 @@ if family == "pool" and action == "remove" then
   end
   assert(found, "no DHCP pool on interface " .. interfaceName)
   save(settings, path, "removed DHCP pool from " .. interfaceName)
+  return
+end
+
+if family == "pool" and action == "dns" then
+  local interfaceName = arguments[3]
+  if not interfaceName or not arguments[4] then usage() return end
+  local settings, path = load()
+  local pool
+  for _, candidate in ipairs(settings.dhcp.pools) do
+    if candidate.interface == interfaceName then pool = candidate break end
+  end
+  assert(pool, "no DHCP pool on interface " .. interfaceName)
+  pool.dns = {}
+  if arguments[4]:lower() ~= "none" then
+    for index = 4, #arguments do
+      ipv4(arguments[index])
+      pool.dns[#pool.dns + 1] = arguments[index]
+    end
+  end
+  save(settings, path, "set DNS servers on DHCP pool " .. interfaceName .. " to " ..
+    (#pool.dns > 0 and table.concat(pool.dns, ", ") or "none"))
+  return
+end
+
+if family == "pool" and action == "search" then
+  local interfaceName = arguments[3]
+  if not interfaceName or not arguments[4] then usage() return end
+  local settings, path = load()
+  local pool
+  for _, candidate in ipairs(settings.dhcp.pools) do
+    if candidate.interface == interfaceName then pool = candidate break end
+  end
+  assert(pool, "no DHCP pool on interface " .. interfaceName)
+  pool.search = {}
+  if arguments[4]:lower() ~= "none" then
+    for index = 4, #arguments do
+      local suffix = DNS.normalize(arguments[index])
+      assert(suffix ~= "", "search domain cannot be the DNS root")
+      pool.search[#pool.search + 1] = suffix
+    end
+  end
+  save(settings, path, "set DNS search domains on DHCP pool " .. interfaceName .. " to " ..
+    (#pool.search > 0 and table.concat(pool.search, ", ") or "none"))
   return
 end
 

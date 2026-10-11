@@ -5,7 +5,7 @@ deliberately keeps the layers separate so programs can use only the part they
 need:
 
 ```text
-Niobium application                    DHCP address assignment
+Niobium application                    DNS names / DHCP assignment
         |                                      |
 DLTP request/response                  DuckNet UDP (datagrams)
         |                                      |
@@ -113,6 +113,9 @@ dhcpd pool list                        list router DHCP pools
 dhcpd pool add <interface> <first> <last> [lease-seconds]
                                         serve addresses on an interface
 dhcpd pool remove <interface>          remove an interface's DHCP pool
+dhcpd pool dns <interface> <ip|none>   advertise DNS resolvers through DHCP
+dhcpd pool search <interface> <domain|none>
+                                        advertise DNS search domains
 dhcpd lease list                       list persistent leases
 dhclient enable <modem> [channel]      acquire an address and enable renewal
 dhclient configure <modem> [channel]   enable DHCP for acquisition at startup
@@ -128,11 +131,21 @@ systemdck create <name> <program> [args...]
                                         create and enable a custom service
 systemdck remove <service>             stop and remove a custom service
 ipconfig [config]                      adapter information
+dig [@server] <name> [type]            query DuckNet DNS
+nslookup <name> [server]               look up a DuckNet host name
+host <name> [server]                   look up a DuckNet host name
+dnsctl resolver list|add|remove ...    configure client recursive resolvers
+dnsctl search list|add|remove ...      configure client search domains
+dnsctl root list|add|remove ...        configure recursive-server root hints
+dnsctl zone list|add|remove ...        manage authoritative zones
+dnsctl record list|add|remove ...      manage authoritative records
+dnsctl server enable <mode>            enable authoritative/recursive DNS
+dnsctl server disable                  disable the DNS service
 route [destination] [config]           routing table or route lookup
 arp [config]                           logical IP to modem mappings
-ping <ip> [count] [timeout]            ICMP reachability and latency
-traceroute <ip> [hops] [timeout]       per-router path discovery
-dltp <method> <ip> <path> [body]       DLTP request client
+ping <host> [count] [timeout]          ICMP reachability and latency
+traceroute <host> [hops] [timeout]     per-router path discovery
+dltp <method> <host> <path> [body]     DLTP request client
 router                                 run the configured router
 serve <site.lua>                       run a configured DLTP website
 uninstall-ducknet                      remove DuckNet
@@ -155,6 +168,7 @@ automatically:
 - `ducknet-network` acquires and renews a client's DHCP lease
 - `ducknet-router` runs packet forwarding and the DHCP server
 - `ducknet-server` runs the configured website
+- `ducknet-dns` answers authoritative and/or recursive DNS queries
 
 For example:
 
@@ -169,9 +183,10 @@ systemdck disable ducknet-server
 On boot, `systemdck` becomes the parent process and opens a normal interactive
 CraftOS shell as one of its parallel tasks. Service output is logged instead of
 being written over the shell prompt. The hosted shell keeps up to 1,000 lines of
-scrollback: use the mouse wheel or Page Up/Page Down to move through it, Home to
-jump to the oldest retained output, and End or any normal typing key to return
-to the live prompt. As with all ComputerCraft cooperative
+scrollback. On an advanced computer, use the mouse wheel; on any computer, use
+Page Up/Page Down to move through it, Home to jump to the oldest retained output,
+and End or any normal typing key to return to the live prompt. CC:Tweaked does
+not emit mouse events on basic computers. As with all ComputerCraft cooperative
 multitasking, a service must eventually yield by waiting for an event, sleeping,
 or calling another yielding API; a program that spins forever without yielding
 would stall the whole computer.
@@ -203,6 +218,47 @@ on systems with background-task support, and displayed by `ipconfig` and
 centralized DHCP across routers will require the future relay service. DHCP is
 currently unauthenticated, so clients trust DHCP servers on their physical modem
 network.
+
+## DNS
+
+DuckNet DNS mirrors the Internet's split between stub, recursive, and
+authoritative resolvers. Clients query a recursive server, which starts with a
+root hint, follows `NS` delegations, and caches results by TTL. DNS uses UDP port
+53 and supports `A`, `NS`, `CNAME`, `SOA`, and `TXT` records.
+
+For example, configure an authoritative `.duck` server at `10.0.0.53`:
+
+```text
+dnsctl zone add duck
+dnsctl record add duck @ SOA "ns.duck hostmaster.duck" 300
+dnsctl record add duck @ NS ns.duck 300
+dnsctl record add duck ns A 10.0.0.53 300
+dnsctl record add duck tracker A 10.0.0.10 300
+dnsctl server enable authoritative
+```
+
+A recursive server needs at least one root hint before it is enabled:
+
+```text
+dnsctl root add 1.0.0.53
+dnsctl server enable recursive
+```
+
+Point a client directly at that recursive server, or advertise it from a LAN's
+DHCP pool:
+
+```text
+dnsctl resolver add 11.0.0.53
+dhcpd pool dns lan 11.0.0.53
+dig tracker.duck
+ping tracker.duck
+niobium tracker.duck
+```
+
+All DNS and zone administration is performed through `dnsctl`; no configuration
+file needs to be edited manually. DNS does not authenticate servers or encrypt
+queries. The planned certificate and secure-transport layers will authenticate
+the domain after resolution; DNSSEC and TCP fallback are later DNS additions.
 
 ## Minimal router
 
