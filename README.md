@@ -46,8 +46,11 @@ The installer provides these profiles:
 - `custom`: manual package selection
 
 Client, router, server, and DNS profiles guide you through network configuration.
-The client profile only asks for its modem side and channel, enables DHCP, and
-acquires its address, subnet, and gateway automatically when the computer starts.
+The client profile asks for its modem side, channel, and DNS resolver, enables
+DHCP, and acquires its address, subnet, and gateway when the computer starts.
+Host profiles default to the `10.0.0.53` DNS resolver. Router LAN setup advertises
+that resolver through DHCP by default, so newly installed clients can resolve
+DuckNet domains without a separate configuration command.
 Every router runs the same forwarding software and gives each interface a role:
 `lan` for client/server networks or `transit` for links to other routers. The
 `home` preset creates one LAN and one or more transit links; the `transit` preset

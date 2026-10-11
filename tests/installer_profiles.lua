@@ -53,7 +53,7 @@ local function runProfile(profile, answers)
   return files
 end
 
-local client = runProfile("client", { "", "client", "", "", "", "" })
+local client = runProfile("client", { "", "client", "", "", "", "", "" })
 assert(client["/ducknet/bin/niobium.lua"], "client did not install Niobium")
 assert(client["/ducknet/bin/ip.lua"], "client did not install the ip command")
 assert(client["/ducknet/bin/dhclient.lua"], "client did not install the DHCP client")
@@ -70,13 +70,13 @@ local clientConfig = assert(load(client["/etc/ducknet/config.lua"], "=client-con
 assert(clientConfig.ip.address == "0.0.0.0")
 assert(clientConfig.link.modem == "left")
 assert(clientConfig.dhcp.client.enabled)
-assert(type(clientConfig.dns.servers) == "table")
+assert(clientConfig.dns.servers[1] == "10.0.0.53")
 assert(client["/startup/zz-systemdck.lua"], "client did not install systemdck startup")
 assert(client["/etc/systemdck/ducknet-network.lua"], "client did not enable network service")
 assert(client["/ducknet/bin/systemdck.lua"], "client did not install systemdck")
 
 local router = runProfile("router", {
-  "", "router", "home", "", "", "left", "11.0.0.0/24", "", "",
+  "", "router", "home", "", "", "left", "11.0.0.0/24", "", "", "",
   "right", "10.255.0.0/30", "", "", "", ""
 })
 assert(router["/ducknet/bin/router.lua"], "router runtime was not installed")
@@ -100,6 +100,7 @@ assert(routerConfig.routes[1].interface == "transit1")
 assert(routerConfig.dhcp.pools[1].interface == "lan")
 assert(routerConfig.dhcp.pools[1].first == "11.0.0.100")
 assert(routerConfig.dhcp.pools[1].last == "11.0.0.200")
+assert(routerConfig.dhcp.pools[1].dns[1] == "10.0.0.53")
 assert(router["/startup/zz-systemdck.lua"], "router service startup was not installed")
 assert(load(router["/startup/zz-systemdck.lua"], "=systemdck-startup"))
 local routerUnit = assert(load(router["/etc/systemdck/ducknet-router.lua"], "=router-unit"))()
@@ -121,7 +122,9 @@ assert(transitConfig.routes[1].network == "11.0.0.0/24")
 assert(transitConfig.routes[1].via == "10.255.0.5")
 assert(transitConfig.routes[1].interface == "transit2")
 
-local server = runProfile("server", { "", "server", "", "", "", "", "", "", "3" })
+local server = runProfile("server", {
+  "", "server", "", "", "", "", "", "", "", "3"
+})
 assert(server["/ducknet/bin/serve.lua"], "server runtime was not installed")
 assert(server["/etc/ducknet/site.lua"]:find("DuckNet Player Tracker", 1, true))
 assert(server["/ducknet/share/sites/foo-bar.lua"], "Foo Bar site was not bundled")
@@ -132,7 +135,7 @@ local serverUnit = assert(load(server["/etc/systemdck/ducknet-server.lua"], "=se
 assert(serverUnit.program == "/ducknet/bin/serve.lua" and serverUnit.enabled)
 
 local dns = runProfile("dns", {
-  "", "dns", "", "", "", "", "", "", "", "", "", "", ""
+  "", "dns", "", "", "", "", "", "", "", "", "", "", "", ""
 })
 assert(dns["/ducknet/bin/dnsd.lua"], "DNS profile did not install the DNS server")
 assert(dns["/ducknet/bin/dnsctl.lua"], "DNS profile did not install DNS administration")
@@ -148,7 +151,7 @@ assert(dnsUnit.program == "/ducknet/bin/dnsd.lua" and dnsUnit.enabled)
 assert(dnsUnit.arguments[2] == "/etc/ducknet/dns.lua")
 
 local recursiveDNS = runProfile("dns", {
-  "", "dns", "", "", "", "", "", "", "recursive", "1.0.0.53, 2.0.0.53"
+  "", "dns", "", "", "", "", "", "", "", "recursive", "1.0.0.53, 2.0.0.53"
 })
 local recursiveConfig = assert(load(recursiveDNS["/etc/ducknet/dns.lua"],
   "=recursive-dns-config"))()

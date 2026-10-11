@@ -361,6 +361,22 @@ local function transitSubnet(index)
   return formatIPv4(ipv4("10.255.0.0") + ((index - 1) * 4)) .. "/30"
 end
 
+local function ipv4List(value)
+  local result = {}
+  if tostring(value or ""):lower() == "none" then return result end
+  for address in tostring(value or ""):gmatch("[^,%s]+") do
+    ipv4(address)
+    result[#result + 1] = address
+  end
+  return result
+end
+
+local function quotedList(values)
+  local result = {}
+  for _, value in ipairs(values or {}) do result[#result + 1] = quote(value) end
+  return table.concat(result, ", ")
+end
+
 local function configureNetwork(role)
   if hadConfig and not yes("Replace the existing DuckNet configuration", false) then
     io.write("keep " .. configPath .. "\n")
@@ -368,7 +384,7 @@ local function configureNetwork(role)
   end
   io.write("\nConfigure the " .. role .. "\n")
   local address, channel, subnet
-  local routes, interfaces, dhcpPools = {}, nil, {}
+  local routes, interfaces, dhcpPools, dnsServers = {}, nil, {}, {}
   local ttl, dltpPort
   local routerPreset, clientDHCP
 
@@ -377,6 +393,8 @@ local function configureNetwork(role)
     channel = number("Modem channel", 4660, 0, 65535)
     ttl = number("Default TTL", 16, 1, 255)
     dltpPort = number("DLTP port", 80, 1, 65535)
+    dnsServers = ipv4List(ask("DNS resolver IPs (comma separated, or none)",
+      "10.0.0.53"))
     address = "0.0.0.0"
     clientDHCP = { modem = modem, channel = channel }
   elseif role ~= "router" then
@@ -386,6 +404,8 @@ local function configureNetwork(role)
     ttl = number("Default TTL", 16, 1, 255)
     subnet = ask("Subnet", defaultSubnet(address))
     dltpPort = number("DLTP port", 80, 1, 65535)
+    dnsServers = ipv4List(ask("DNS resolver IPs (comma separated, or none)",
+      "10.0.0.53"))
     routes[1] = { network = subnet, metric = 10 }
     local gateway = ask("Default gateway (blank for none)", "")
     if gateway ~= "" then
@@ -421,10 +441,12 @@ local function configureNetwork(role)
       if yes("Enable DHCP on LAN " .. lanCount, true) then
         local firstOffset = lan.block - 2 >= 100 and 100 or 2
         local lastOffset = lan.block - 2 >= 200 and 200 or lan.block - 2
+        local poolDNS = ipv4List(ask("DNS servers advertised by DHCP (comma separated, or none)",
+          "10.0.0.53"))
         dhcpPools[#dhcpPools + 1] = {
           interface = name, first = formatIPv4(lan.base + firstOffset),
           last = formatIPv4(lan.base + lastOffset), network = lan.cidr,
-          gateway = lan.first, lease = 3600
+          gateway = lan.first, lease = 3600, dns = poolDNS
         }
       end
       io.write("LAN " .. lanCount .. ": gateway " .. lan.first ..
@@ -544,7 +566,8 @@ local function configureNetwork(role)
       lines[#lines + 1] = "    { interface = " .. quote(pool.interface) ..
         ", first = " .. quote(pool.first) .. ", last = " .. quote(pool.last) ..
         ", network = " .. quote(pool.network) .. ", gateway = " ..
-        quote(pool.gateway) .. ", lease = " .. pool.lease .. " },"
+        quote(pool.gateway) .. ", lease = " .. pool.lease .. ", dns = { " ..
+        quotedList(pool.dns) .. " } },"
     end
     lines[#lines + 1] = "  } },"
   elseif clientDHCP then
@@ -552,7 +575,8 @@ local function configureNetwork(role)
       quote(clientDHCP.modem) .. ", channel = " .. clientDHCP.channel .. " } },"
   end
   lines[#lines + 1] = "  tcp = { mtu = 4096, timeout = 2, retries = 4 },"
-  lines[#lines + 1] = "  dns = { servers = {}, search = {} },"
+  lines[#lines + 1] = "  dns = { servers = { " .. quotedList(dnsServers) ..
+    " }, search = {} },"
   lines[#lines + 1] = "  dltp = { port = " .. dltpPort .. " }"
   lines[#lines + 1] = "}"
   writeAtomic(configPath, table.concat(lines, "\n") .. "\n")
@@ -583,10 +607,7 @@ local function configureDNS(address)
   if settings.recursive then
     local roots = ask("Root DNS server IPs (comma separated)")
     assert(roots and roots ~= "", "a recursive DNS server needs at least one root hint")
-    for root in roots:gmatch("[^,%s]+") do
-      ipv4(root)
-      settings.roots[#settings.roots + 1] = root
-    end
+    settings.roots = ipv4List(roots)
     assert(#settings.roots > 0, "a recursive DNS server needs at least one root hint")
   end
 
