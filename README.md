@@ -64,9 +64,9 @@ The server profile can activate the bundled Foo Bar test, Hello World site, or
 interactive Player Tracker, or download a DuckNet server application from a
 GitHub raw/blob URL. Start a
 configured server with `serve /etc/ducknet/site.lua`, or a router with
-`router`. Client, router, and server profiles install their long-running work as
-`systemdck` services. Rebooting an advanced computer starts enabled services,
-and failed services are restarted automatically.
+`router`. On CC:Tweaked, client, router, and server profiles install their
+long-running work as `systemdck` services. Rebooting starts enabled services on
+basic and advanced computers, and failed services are restarted automatically.
 
 The Player Tracker site requires an Advanced Peripherals Player Detector
 attached to the server computer. Open it in Niobium, enter an online Minecraft
@@ -79,7 +79,8 @@ is intended.
 Every push to `main` is tested and published automatically. The release pipeline
 increments the latest semantic patch version, tags the tested commit, builds the
 self-contained installer, and uploads it as the new latest GitHub Release. For
-example, the push after `v0.1.0` becomes `v0.1.1`.
+The current release series is `v0.2.x`; for example, the push after `v0.2.0`
+becomes `v0.2.1`.
 
 On OpenComputers, packages use the normal `/usr/lib`, `/usr/bin`, and
 `/usr/share/ducknet` directories. CC:Tweaked keeps everything organized under
@@ -120,6 +121,7 @@ dhclient status                        show the current lease
 dhclient release                       return and disable the current lease
 systemdck list                         list installed background services
 systemdck status <service>             show service state and restart count
+systemdck logs <service>               show captured service output
 systemdck start|stop|restart <service> control a service immediately
 systemdck enable|disable <service>     control whether a service starts at boot
 systemdck create <name> <program> [args...]
@@ -141,11 +143,14 @@ separately before deleting `/etc/ducknet` configuration and website data.
 
 ## Background services
 
-`systemdck` is DuckNet's small service supervisor for advanced CC:Tweaked
-computers. It uses multishell tabs as isolated background tasks, records service
-state under `/var/run/systemdck`, restarts failed programs, and starts enabled
-unit files from `/etc/systemdck` during boot. Installed profiles create these
-units automatically:
+`systemdck` is DuckNet's small service supervisor for CC:Tweaked. It uses the
+standard `parallel` API to cooperatively run an interactive shell, its control
+loop, and up to 16 service workers in one top-level process. This works on both
+basic and advanced computers and does not depend on multishell. It records state
+under `/var/run/systemdck`, captures service output under
+`/var/log/systemdck`, restarts failed programs, and starts enabled unit files
+from `/etc/systemdck` during boot. Installed profiles create these units
+automatically:
 
 - `ducknet-network` acquires and renews a client's DHCP lease
 - `ducknet-router` runs packet forwarding and the DHCP server
@@ -156,13 +161,17 @@ For example:
 ```text
 systemdck list
 systemdck status ducknet-network
+systemdck logs ducknet-network
 systemdck restart ducknet-router
 systemdck disable ducknet-server
 ```
 
-Basic computers do not provide multishell and therefore cannot run background
-services alongside an interactive shell. They can still run DuckNet programs in
-the foreground; use an advanced computer for an automatically managed node.
+On boot, `systemdck` becomes the parent process and opens a normal interactive
+CraftOS shell as one of its parallel tasks. Service output is logged instead of
+being written over the shell prompt. As with all ComputerCraft cooperative
+multitasking, a service must eventually yield by waiting for an event, sleeping,
+or calling another yielding API; a program that spins forever without yielding
+would stall the whole computer.
 
 ## DHCP
 

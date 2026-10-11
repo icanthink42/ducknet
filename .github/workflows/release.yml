@@ -15,6 +15,8 @@ concurrency:
 jobs:
   release:
     runs-on: ubuntu-latest
+    env:
+      RELEASE_SERIES: "0.2"
     steps:
       - uses: actions/checkout@v4
         with:
@@ -24,9 +26,9 @@ jobs:
         id: version
         shell: bash
         run: |
-          latest="$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n 1)"
+          latest="$(git tag --list "v${RELEASE_SERIES}.*" --sort=-v:refname | head -n 1)"
           if [[ -z "$latest" ]]; then
-            next="v0.1.0"
+            next="v${RELEASE_SERIES}.0"
           else
             version="${latest#v}"
             IFS=. read -r major minor patch <<< "$version"

@@ -47,7 +47,6 @@ local packages = {
   tools = {
     { "ducknet/lib/ducknet/cli.lua", "/usr/lib/ducknet/cli.lua" },
     { "ducknet/bin/systemdck.lua", "/usr/bin/systemdck.lua" },
-    { "ducknet/bin/systemdck-run.lua", "/usr/bin/systemdck-run.lua" },
     { "ducknet/bin/networkd.lua", "/usr/bin/networkd.lua" },
     { "ducknet/bin/ip.lua", "/usr/bin/ip.lua" },
     { "ducknet/bin/dhclient.lua", "/usr/bin/dhclient.lua" },
@@ -238,13 +237,14 @@ local function removeLegacyCommands()
     "/niobium.lua", "/uninstall-ducknet.lua", "/ducknet.lua", "/niobium",
     "/duck-ipconfig.lua", "/duck-route.lua", "/duck-neighbors.lua",
     "/duck-ping.lua", "/duck-traceroute.lua", "/duck-router.lua",
-    "/duckserve.lua"
+    "/duckserve.lua", "/ducknet/bin/systemdck-run.lua",
+    "/startup/10-systemdck.lua"
   } or {
     "/usr/lib/ducknet/crypto.lua",
     "/usr/bin/duck-ipconfig.lua", "/usr/bin/duck-route.lua",
     "/usr/bin/duck-neighbors.lua", "/usr/bin/duck-ping.lua",
     "/usr/bin/duck-traceroute.lua", "/usr/bin/duck-router.lua",
-    "/usr/bin/duckserve.lua"
+    "/usr/bin/duckserve.lua", "/usr/bin/systemdck-run.lua"
   }
   for _, path in ipairs(paths) do
     if exists(path) then remove(path) end
@@ -612,13 +612,10 @@ local function configureStartup(role)
       "}\n"
     assert(load(body, "=systemdck-unit"))
     writeAtomic("/etc/systemdck/ducknet-" .. role .. ".lua", body)
-    local boot = [[if multishell then
-  shell.run("/ducknet/bin/systemdck.lua", "start-enabled")
-else
-  printError("systemdck requires an advanced computer")
-end
+    local boot = [[shell.run("/ducknet/bin/systemdck.lua", "boot")
 ]]
-    writeAtomic("/startup/10-systemdck.lua", boot)
+    writeAtomic("/startup/zz-systemdck.lua", boot)
+    if exists("/startup/10-systemdck.lua") then remove("/startup/10-systemdck.lua") end
   else
     local opposite = role == "router" and "ducknet-server" or "ducknet-router"
     local oppositePath = "/etc/rc.d/" .. opposite .. ".lua"
@@ -670,14 +667,11 @@ local function configureClientDHCPStartup()
 }
 ]]
     writeAtomic("/etc/systemdck/ducknet-network.lua", unit)
-    local body = [[if multishell then
-  shell.run("/ducknet/bin/systemdck.lua", "start-enabled")
-else
-  printError("systemdck requires an advanced computer")
-end
+    local body = [[shell.run("/ducknet/bin/systemdck.lua", "boot")
 ]]
-    writeAtomic("/startup/10-systemdck.lua", body)
+    writeAtomic("/startup/zz-systemdck.lua", body)
     if exists("/startup/10-ducknet-dhcp.lua") then remove("/startup/10-ducknet-dhcp.lua") end
+    if exists("/startup/10-systemdck.lua") then remove("/startup/10-systemdck.lua") end
     return
   end
   local body = [[local worker

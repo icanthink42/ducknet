@@ -1,9 +1,9 @@
 local root = (... and ... ~= "" and ...) or "."
-local originalFs, originalMultishell, originalQueueEvent = _G.fs, _G.multishell, os.queueEvent
-local originalParallel, originalShell, originalPullEvent, originalSleep =
-  _G.parallel, _G.shell, os.pullEvent, _G.sleep
+local originalFs, originalParallel = _G.fs, _G.parallel
+local originalQueueEvent, originalPullEvent, originalStartTimer =
+  os.queueEvent, os.pullEvent, os.startTimer
 local originalConfig = package.loaded["ducknet.config"]
-local records, tabs, events, nextPid = {}, {}, {}, 1
+local records, events = {}, {}
 
 local function copy(value)
   if type(value) ~= "table" then return value end
@@ -16,9 +16,10 @@ records["/etc/systemdck/demo.lua"] = {
   description = "Test service", program = "/test.lua", arguments = { "one" },
   enabled = true, restart = "always"
 }
+records["/var/run/systemdck/demo.lua"] = { state = "running", worker = 1, restarts = 2 }
 package.loaded["ducknet.config"] = {
   load = function(path)
-    if not records[path] then return nil, "missing" end
+    if type(records[path]) ~= "table" then return nil, "missing" end
     return copy(records[path])
   end,
   save = function(value, path) records[path] = copy(value) return true end
@@ -26,7 +27,7 @@ package.loaded["ducknet.config"] = {
 _G.fs = {
   makeDir = function() end,
   exists = function(path)
-    if records[path] then return true end
+    if records[path] ~= nil then return true end
     local prefix = path:gsub("/+$", "") .. "/"
     for candidate in pairs(records) do
       if candidate:sub(1, #prefix) == prefix then return true end
@@ -43,57 +44,57 @@ _G.fs = {
     end
     return result
   end,
-  open = function(path)
-    local chunks = {}
+  open = function(path, mode)
+    local chunks = mode == "a" and { records[path] or "" } or {}
     return {
       write = function(value) chunks[#chunks + 1] = value end,
-      close = function() records[path] = table.concat(chunks) end
+      readAll = function() return records[path] or "" end,
+      close = function() if mode ~= "r" then records[path] = table.concat(chunks) end end
     }
   end,
   delete = function(path) records[path] = nil end
 }
-_G.multishell = {
-  launch = function(_, program, name)
-    nextPid = nextPid + 1
-    tabs[nextPid] = { program = program, service = name }
-    return nextPid
-  end,
-  setTitle = function(pid, title) tabs[pid].title = title end,
-  getTitle = function(pid) assert(tabs[pid], "no tab") return tabs[pid].title end
-}
-os.queueEvent = function(...) events[#events + 1] = { ... } end
+_G.parallel = {}
+os.queueEvent = function(event, token, requested, name)
+  if event == "systemdck_request" then
+    events[#events + 1] = { "systemdck_response", token, true,
+      requested .. " accepted for " .. name }
+  end
+end
+os.pullEvent = function() return table.unpack(table.remove(events, 1)) end
+os.startTimer = function() return 99 end
 
 local program = assert(loadfile(root .. "/ducknet/bin/systemdck.lua"))
+program("status", "demo")
 program("start", "demo")
-local state = records["/var/run/systemdck/demo.lua"]
-assert(state.state == "running" and state.pid == 2)
-assert(tabs[2].program == "/ducknet/bin/systemdck-run.lua")
 program("restart", "demo")
-state = records["/var/run/systemdck/demo.lua"]
-assert(state.state == "restarting" and state.pid == 2)
-assert(events[#events][1] == "systemdck_control" and events[#events][3] == "restart")
 program("disable", "demo")
 assert(not records["/etc/systemdck/demo.lua"].enabled)
 program("enable", "demo")
 assert(records["/etc/systemdck/demo.lua"].enabled)
+assert(records["/startup/zz-systemdck.lua"]:find('"boot"', 1, true))
 program("create", "worker", "/worker.lua", "hello")
 assert(records["/etc/systemdck/worker.lua"].arguments[1] == "hello")
-program("start-enabled")
-assert(records["/var/run/systemdck/worker.lua"].state == "running")
+records["/var/log/systemdck/demo.log"] = "test log\n"
+program("logs", "demo")
+records["/var/run/systemdck/worker.lua"] = { state = "inactive" }
 program("remove", "worker")
 assert(not records["/etc/systemdck/worker.lua"])
 
--- A control event cleanly stops the runner and its managed coroutine.
-records["/var/run/systemdck/demo.lua"] = { state = "running", pid = 2 }
-_G.parallel = { waitForAny = function(_, control) control() return 2 end }
-_G.shell = { run = function() error("service should have been cancelled") end }
-os.pullEvent = function() return "systemdck_control", "demo", "stop" end
-_G.sleep = function() end
-assert(loadfile(root .. "/ducknet/bin/systemdck-run.lua"))("demo")
-assert(records["/var/run/systemdck/demo.lua"].state == "inactive")
+-- Boot builds one manager, one interactive shell, and sixteen parallel workers.
+_G.parallel.waitForAll = function(...)
+  assert(select("#", ...) == 18, "unexpected systemdck task count")
+end
+program("boot")
+assert(records["/var/run/systemdck/demo.lua"].state == "starting")
+assert(records["/var/run/systemdck/demo.lua"].worker == 1)
 
-_G.fs, _G.multishell, os.queueEvent = originalFs, originalMultishell, originalQueueEvent
-_G.parallel, _G.shell, os.pullEvent, _G.sleep =
-  originalParallel, originalShell, originalPullEvent, originalSleep
+local source = assert(io.open(root .. "/ducknet/bin/systemdck.lua", "r")):read("*a")
+assert(source:find("parallel.waitForAll", 1, true))
+assert(not source:find("multishell", 1, true))
+
+_G.fs, _G.parallel = originalFs, originalParallel
+os.queueEvent, os.pullEvent, os.startTimer =
+  originalQueueEvent, originalPullEvent, originalStartTimer
 package.loaded["ducknet.config"] = originalConfig
 io.write("all systemdck tests passed\n")

@@ -64,14 +64,11 @@ local function installStartup(configPath)
       program = "/ducknet/bin/networkd.lua", arguments = { configPath },
       enabled = true, restart = "always", restartDelay = 5
     }, "/etc/systemdck/ducknet-network.lua"))
-    local file = assert(fs.open("/startup/10-systemdck.lua", "w"))
-    file.write("if multishell then\n" ..
-      "  shell.run(\"/ducknet/bin/systemdck.lua\", \"start-enabled\")\n" ..
-      "else\n" ..
-      "  printError(\"systemdck requires an advanced computer\")\n" ..
-      "end\n")
+    local file = assert(fs.open("/startup/zz-systemdck.lua", "w"))
+    file.write("shell.run(\"/ducknet/bin/systemdck.lua\", \"boot\")\n")
     file.close()
     if fs.exists("/startup/10-ducknet-dhcp.lua") then fs.delete("/startup/10-ducknet-dhcp.lua") end
+    if fs.exists("/startup/10-systemdck.lua") then fs.delete("/startup/10-systemdck.lua") end
     return
   end
   local servicePath = "/etc/rc.d/ducknet-dhcp.lua"
