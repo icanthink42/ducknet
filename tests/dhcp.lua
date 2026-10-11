@@ -83,12 +83,13 @@ assert(phase == "ack" and lease.address == "11.0.0.101")
 
 -- Exercise DORA through real UDP and IP layers on a multi-interface router.
 local endpoints = {}
-local function networkLink(name, segment)
-  local result = { name = name, segment = segment, queue = {} }
+local function networkLink(name, segment, address)
+  local result = { name = name, segment = segment, address = address, queue = {} }
   endpoints[#endpoints + 1] = result
-  function result:send(_, frame)
+  function result:send(nextHop, frame)
     for _, endpoint in ipairs(endpoints) do
-      if endpoint ~= self and endpoint.segment == self.segment then
+      if endpoint ~= self and endpoint.segment == self.segment and
+          (nextHop == DHCP.BROADCAST or nextHop == endpoint.address) then
         endpoint.queue[#endpoint.queue + 1] = { from = self.name, frame = frame }
       end
     end
@@ -109,17 +110,18 @@ local function networkLink(name, segment)
   return result
 end
 
-local clientIP = IP.new(networkLink("client", "lan"), {
+local clientIP = IP.new(networkLink("client", "lan", "0.0.0.0"), {
   address = "0.0.0.0", clock = os.clock
 })
-local routerIP = IP.new(networkLink("router-lan", "lan"), {
+local routerIP = IP.new(networkLink("router-lan", "lan", "10.0.0.1"), {
   address = "10.0.0.1", interface = "lan", forwarding = true, clock = os.clock
 })
-routerIP:addInterface(networkLink("router-transit", "transit"), {
+routerIP:addInterface(networkLink("router-transit", "transit", "10.255.0.2"), {
   name = "transit1", address = "10.255.0.2"
 })
 routerIP:addRoute("10.0.0.0/16", nil, 10, "lan")
 routerIP:addRoute("10.255.0.0/30", nil, 10, "transit1")
+routerIP:addRoute("0.0.0.0/0", "10.255.0.1", 100, "transit1")
 local clientDatagrams, routerDatagrams = UDP.new(clientIP), UDP.new(routerIP)
 local integrationLeasePath = os.tmpname()
 os.remove(integrationLeasePath)

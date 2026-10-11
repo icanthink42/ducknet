@@ -122,11 +122,16 @@ function IP:_transmit(packet)
 end
 
 function IP:_transmitOn(packet, interfaceName)
-  local nextHop, routeOrError = self:route(packet.dst)
-  local interface = interfaceName and self.interfaceByName[interfaceName] or
-    (type(routeOrError) == "table" and routeOrError.interface)
-  if not interface then return nil, routeOrError end
-  nextHop = nextHop or packet.dst
+  local nextHop, routeOrError, interface
+  if interfaceName then
+    interface = self.interfaceByName[interfaceName]
+    if not interface then return nil, "unknown route interface " .. tostring(interfaceName) end
+    nextHop = packet.dst
+  else
+    nextHop, routeOrError = self:route(packet.dst)
+    interface = type(routeOrError) == "table" and routeOrError.interface
+    if not interface then return nil, routeOrError end
+  end
   return interface.link:send(nextHop, codec.encode(packet))
 end
 
