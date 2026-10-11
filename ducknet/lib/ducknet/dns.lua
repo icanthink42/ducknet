@@ -331,7 +331,10 @@ function Server:serveOnce(timeout)
   if not query then return true end
   local response = self:_response(query)
   return self.udp:send(datagram.src, datagram.srcPort, encode(response), {
-    sourcePort = DNS.PORT, source = datagram.dst, interface = datagram.interface
+    -- Preserve the queried destination as the source address, but let IP choose
+    -- the return route. Forcing the incoming interface treats remote clients as
+    -- directly attached and bypasses the server's configured gateway.
+    sourcePort = DNS.PORT, source = datagram.dst
   })
 end
 

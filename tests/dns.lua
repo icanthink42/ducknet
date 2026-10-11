@@ -96,5 +96,7 @@ local server = DNS.server(serverUDP, {
 assert(server:serveOnce(1))
 assert(sent.destination == "10.0.0.2" and sent.port == 53000)
 assert(sent.options.sourcePort == DNS.PORT and sent.response.answers[1].value == "10.0.0.10")
+assert(sent.options.source == "10.0.0.53")
+assert(sent.options.interface == nil, "DNS reply bypassed IP return-route selection")
 
 io.write("all DNS tests passed\n")
