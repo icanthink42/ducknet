@@ -173,7 +173,10 @@ assert(records["/var/run/systemdck/demo.lua"].state == "inactive")
 -- Keypad navigation is processed inside the foreground shell scheduler before
 -- it is forwarded to CraftOS. Some keyboards report their Page Up key as
 -- numPad9, including the layout used by the in-game test computer.
-local rawEvents = { { "key", 329, false } }
+local rawEvents = {
+  { "key", 329, false },
+  { "char", "9" },
+}
 os.pullEventRaw = function()
   local nextEvent = table.remove(rawEvents, 1)
   if not nextEvent then return coroutine.yield() end
@@ -182,7 +185,8 @@ end
 local interactive = coroutine.create(bootTasks[2])
 assert(coroutine.resume(interactive))
 assert(coroutine.status(interactive) == "suspended")
-assert(terminalRows[1]:match("line 4"), "keypad Page Up did not reveal retained output")
+assert(terminalRows[1]:match("line 4"),
+  "keypad Page Up character returned the console to live output")
 
 -- Ctrl+T reaches the foreground shell, but background environments and the
 -- supervisor ignore the broadcast terminate event.

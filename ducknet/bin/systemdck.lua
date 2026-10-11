@@ -285,6 +285,7 @@ local function runSupervisor()
       local shellTask = coroutine.create(function() shell.run("shell") end)
       local filter
       local event = { n = 0 }
+      local suppressKeypadChar
       while coroutine.status(shellTask) ~= "dead" do
         local forward = true
         if event[1] == "mouse_scroll" then
@@ -294,19 +295,28 @@ local function runSupervisor()
         elseif event[1] == "key" and type(keys) == "table" then
           if event[2] == keys.pageUp or event[2] == keys.numPad9 then
             console:view(math.max(1, math.floor(console.height / 2)))
+            if event[2] == keys.numPad9 then suppressKeypadChar = event[2] end
             forward = false
           elseif event[2] == keys.pageDown or event[2] == keys.numPad3 then
             console:view(-math.max(1, math.floor(console.height / 2)))
+            if event[2] == keys.numPad3 then suppressKeypadChar = event[2] end
             forward = false
           elseif event[2] == keys.home or event[2] == keys.numPad7 then
             console:view(1000)
+            if event[2] == keys.numPad7 then suppressKeypadChar = event[2] end
             forward = false
           elseif event[2] == keys["end"] or event[2] == keys.numPad1 then
             console:follow()
+            if event[2] == keys.numPad1 then suppressKeypadChar = event[2] end
             forward = false
           else
             console:follow()
           end
+        elseif event[1] == "char" and suppressKeypadChar then
+          suppressKeypadChar = nil
+          forward = false
+        elseif event[1] == "key_up" and event[2] == suppressKeypadChar then
+          suppressKeypadChar = nil
         elseif event[1] == "char" or event[1] == "paste" then
           console:follow()
         end
