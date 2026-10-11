@@ -2,6 +2,7 @@ local root = (... and ... ~= "" and ...) or "."
 local originalFs, originalParallel = _G.fs, _G.parallel
 local originalQueueEvent, originalPullEvent, originalStartTimer =
   os.queueEvent, os.pullEvent, os.startTimer
+local originalPullEventRaw = os.pullEventRaw
 local originalConfig = package.loaded["ducknet.config"]
 local records, events = {}, {}
 
@@ -66,6 +67,7 @@ os.pullEvent = function()
   if not event then return coroutine.yield() end
   return table.unpack(event)
 end
+os.pullEventRaw = os.pullEvent
 os.startTimer = function() return 99 end
 
 -- CraftOS program environments contain package, while their _G base may not.
@@ -77,6 +79,15 @@ end
 craftGlobal._G = craftGlobal
 local programEnvironment = setmetatable({ package = package }, { __index = craftGlobal })
 programEnvironment._G = craftGlobal
+local hostRequire = require
+programEnvironment.require = function(name)
+  if name == "cc.require" then
+    return { make = function()
+      return hostRequire, { path = package.path }
+    end }
+  end
+  return hostRequire(name)
+end
 local program = assert(loadfile(root .. "/ducknet/bin/systemdck.lua", "t", programEnvironment))
 program("status", "demo")
 program("start", "demo")
@@ -113,10 +124,30 @@ end
 local worker = coroutine.create(bootTasks[3])
 assert(coroutine.resume(worker))
 assert(coroutine.status(worker) == "suspended")
-assert(serviceEnvironment.package == package,
-  "service environment did not inherit the global package library")
+assert(serviceEnvironment.package ~= package,
+  "service environment did not receive an isolated package library")
+assert(serviceEnvironment.package.path == package.path)
+assert(type(serviceEnvironment.require) == "function")
 assert(serviceEnvironment._G == serviceEnvironment)
 assert(records["/var/run/systemdck/demo.lua"].state == "inactive")
+
+-- Ctrl+T reaches the foreground shell, but background environments and the
+-- supervisor ignore the broadcast terminate event.
+local rawEvents = {
+  { "terminate" },
+  { "modem_message", "left" },
+}
+os.pullEventRaw = function()
+  local event = table.remove(rawEvents, 1)
+  if not event then return coroutine.yield() end
+  return table.unpack(event)
+end
+local event, side = serviceEnvironment.os.pullEventRaw("modem_message")
+assert(event == "modem_message" and side == "left")
+rawEvents = { { "terminate" } }
+local manager = coroutine.create(bootTasks[1])
+assert(coroutine.resume(manager))
+assert(coroutine.status(manager) == "suspended")
 
 local source = assert(io.open(root .. "/ducknet/bin/systemdck.lua", "r")):read("*a")
 assert(source:find("parallel.waitForAll", 1, true))
@@ -126,5 +157,6 @@ assert(not source:find("os.run", 1, true))
 _G.fs, _G.parallel = originalFs, originalParallel
 os.queueEvent, os.pullEvent, os.startTimer =
   originalQueueEvent, originalPullEvent, originalStartTimer
+os.pullEventRaw = originalPullEventRaw
 package.loaded["ducknet.config"] = originalConfig
 io.write("all systemdck tests passed\n")

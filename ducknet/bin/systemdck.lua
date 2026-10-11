@@ -101,14 +101,27 @@ local function serviceEnvironment(name)
   serviceIO.write = function(...) appendLog(name, values(...)) end
   serviceIO.stdout = { write = function(_, ...) appendLog(name, values(...)) end }
   serviceIO.stderr = { write = function(_, ...) appendLog(name, values(...)) end }
+  local serviceOS = {}
+  for key, value in pairs(parentEnvironment.os) do serviceOS[key] = value end
+  serviceOS.pullEventRaw = function(filter)
+    while true do
+      local event = { parentEnvironment.os.pullEventRaw(filter) }
+      if event[1] ~= "terminate" then return unpack(event) end
+    end
+  end
+  serviceOS.pullEvent = serviceOS.pullEventRaw
   local environment = {
     print = line,
     printError = function(...) appendLog(name, "ERROR: " .. values(...) .. "\n") end,
     write = function(value) appendLog(name, tostring(value)) end,
-    io = serviceIO
+    io = serviceIO,
+    os = serviceOS
   }
   setmetatable(environment, { __index = parentEnvironment })
   environment._G = environment
+  local requireFactory = parentEnvironment.require("cc.require")
+  environment.require, environment.package = requireFactory.make(environment, "/")
+  environment.package.path = parentEnvironment.package.path
   return environment
 end
 
@@ -153,39 +166,41 @@ local function runSupervisor()
 
   local function manager()
     while true do
-      local _, token, requested, name = os.pullEvent("systemdck_request")
-      local ok, message
-      if type(name) ~= "string" or not name:match("^[%w][%w_.-]*$") then
-        ok, message = false, "invalid service name"
-      elseif requested == "start" then
-        ok, message = assign(name)
-      elseif requested == "stop" or requested == "restart" then
-        local workerIndex = findWorker(name)
-        if workerIndex then
-          controls[workerIndex] = requested
-          local state = loadState(name)
-          state.state = requested == "stop" and "stopping" or "restarting"
-          saveState(name, state)
-          os.queueEvent("systemdck_control", workerIndex)
-          ok, message = true, requested == "stop" and ("stopping " .. name) or
-            ("restarting " .. name)
-        elseif requested == "restart" then
+      local event, token, requested, name = os.pullEventRaw("systemdck_request")
+      if event == "systemdck_request" then
+        local ok, message
+        if type(name) ~= "string" or not name:match("^[%w][%w_.-]*$") then
+          ok, message = false, "invalid service name"
+        elseif requested == "start" then
           ok, message = assign(name)
+        elseif requested == "stop" or requested == "restart" then
+          local workerIndex = findWorker(name)
+          if workerIndex then
+            controls[workerIndex] = requested
+            local state = loadState(name)
+            state.state = requested == "stop" and "stopping" or "restarting"
+            saveState(name, state)
+            os.queueEvent("systemdck_control", workerIndex)
+            ok, message = true, requested == "stop" and ("stopping " .. name) or
+              ("restarting " .. name)
+          elseif requested == "restart" then
+            ok, message = assign(name)
+          else
+            ok, message = true, name .. " is already stopped"
+          end
         else
-          ok, message = true, name .. " is already stopped"
+          ok, message = false, "unknown supervisor request"
         end
-      else
-        ok, message = false, "unknown supervisor request"
+        os.queueEvent("systemdck_response", token, ok, message)
       end
-      os.queueEvent("systemdck_response", token, ok, message)
     end
   end
 
   local function worker(index)
     while true do
       while not assignments[index] do
-        local _, target = os.pullEvent("systemdck_dispatch")
-        if target == index then break end
+        local event, target = os.pullEventRaw("systemdck_dispatch")
+        if event == "systemdck_dispatch" and target == index then break end
       end
       local name = assignments[index]
       if name then
@@ -221,8 +236,12 @@ local function runSupervisor()
             if not success then appendLog(name, "ERROR: " .. message .. "\n") end
           end, function()
             while true do
-              local _, target = os.pullEvent("systemdck_control")
-              if target == index then controlled = controls[index] controls[index] = nil return end
+              local event, target = os.pullEventRaw("systemdck_control")
+              if event == "systemdck_control" and target == index then
+                controlled = controls[index]
+                controls[index] = nil
+                return
+              end
             end
           end)
           if controlled == "stop" then
@@ -247,8 +266,8 @@ local function runSupervisor()
             local delay = tonumber(unit.restartDelay) or 2
             parallel.waitForAny(function() sleep(delay) end, function()
               while true do
-                local _, target = os.pullEvent("systemdck_control")
-                if target == index then return end
+                local event, target = os.pullEventRaw("systemdck_control")
+                if event == "systemdck_control" and target == index then return end
               end
             end)
           end
