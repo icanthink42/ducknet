@@ -2,6 +2,7 @@ local root = (... and ... ~= "" and ...) or "."
 local originalFs, originalParallel = _G.fs, _G.parallel
 local originalQueueEvent, originalPullEvent, originalStartTimer =
   os.queueEvent, os.pullEvent, os.startTimer
+local originalRun = os.run
 local originalConfig = package.loaded["ducknet.config"]
 local records, events = {}, {}
 
@@ -61,7 +62,11 @@ os.queueEvent = function(event, token, requested, name)
       requested .. " accepted for " .. name }
   end
 end
-os.pullEvent = function() return table.unpack(table.remove(events, 1)) end
+os.pullEvent = function()
+  local event = table.remove(events, 1)
+  if not event then return coroutine.yield() end
+  return table.unpack(event)
+end
 os.startTimer = function() return 99 end
 
 local program = assert(loadfile(root .. "/ducknet/bin/systemdck.lua"))
@@ -82,12 +87,28 @@ program("remove", "worker")
 assert(not records["/etc/systemdck/worker.lua"])
 
 -- Boot builds one manager, one interactive shell, and sixteen parallel workers.
+local bootTasks, serviceEnvironment
+records["/etc/systemdck/demo.lua"].restart = "no"
 _G.parallel.waitForAll = function(...)
   assert(select("#", ...) == 18, "unexpected systemdck task count")
+  bootTasks = { ... }
 end
 program("boot")
 assert(records["/var/run/systemdck/demo.lua"].state == "starting")
 assert(records["/var/run/systemdck/demo.lua"].worker == 1)
+_G.parallel.waitForAny = function(run) run() return 1 end
+os.run = function(environment, path, argument)
+  serviceEnvironment = environment
+  assert(path == "/test.lua" and argument == "one")
+  return true
+end
+local worker = coroutine.create(bootTasks[3])
+assert(coroutine.resume(worker))
+assert(coroutine.status(worker) == "suspended")
+assert(serviceEnvironment.package == package,
+  "service environment did not inherit the global package library")
+assert(serviceEnvironment._G == serviceEnvironment)
+assert(records["/var/run/systemdck/demo.lua"].state == "inactive")
 
 local source = assert(io.open(root .. "/ducknet/bin/systemdck.lua", "r")):read("*a")
 assert(source:find("parallel.waitForAll", 1, true))
@@ -96,5 +117,6 @@ assert(not source:find("multishell", 1, true))
 _G.fs, _G.parallel = originalFs, originalParallel
 os.queueEvent, os.pullEvent, os.startTimer =
   originalQueueEvent, originalPullEvent, originalStartTimer
+os.run = originalRun
 package.loaded["ducknet.config"] = originalConfig
 io.write("all systemdck tests passed\n")

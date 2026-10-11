@@ -100,12 +100,15 @@ local function serviceEnvironment(name)
   serviceIO.write = function(...) appendLog(name, values(...)) end
   serviceIO.stdout = { write = function(_, ...) appendLog(name, values(...)) end }
   serviceIO.stderr = { write = function(_, ...) appendLog(name, values(...)) end }
-  return {
+  local environment = {
     print = line,
     printError = function(...) appendLog(name, "ERROR: " .. values(...) .. "\n") end,
     write = function(value) appendLog(name, tostring(value)) end,
     io = serviceIO
   }
+  setmetatable(environment, { __index = _G })
+  environment._G = environment
+  return environment
 end
 
 local function runSupervisor()
