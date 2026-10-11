@@ -41,10 +41,11 @@ The installer provides these profiles:
 - `client`: automatic DHCP, Niobium, DLTP, TCP/IP, and diagnostic tools
 - `router`: multi-interface packet forwarding, route configuration, and diagnostic tools
 - `server`: the DLTP server runtime, network configuration, and website setup
+- `dns`: static networking, authoritative/recursive DNS setup, and a DNS service
 - `developer`: every library, program, example, and bundled website
 - `custom`: manual package selection
 
-Client, router, and server profiles guide you through network configuration.
+Client, router, server, and DNS profiles guide you through network configuration.
 The client profile only asks for its modem side and channel, enables DHCP, and
 acquires its address, subnet, and gateway automatically when the computer starts.
 Every router runs the same forwarding software and gives each interface a role:
@@ -64,9 +65,15 @@ The server profile can activate the bundled Foo Bar test, Hello World site, or
 interactive Player Tracker, or download a DuckNet server application from a
 GitHub raw/blob URL. Start a
 configured server with `serve /etc/ducknet/site.lua`, or a router with
-`router`. On CC:Tweaked, client, router, and server profiles install their
+`router`. On CC:Tweaked, client, router, server, and DNS profiles install their
 long-running work as `systemdck` services. Rebooting starts enabled services on
 basic and advanced computers, and failed services are restarted automatically.
+
+The `dns` profile defaults to an authoritative `.duck` server at `10.0.0.53`.
+It creates the zone's SOA, NS, and nameserver A records and enables
+`ducknet-dns` at startup. It can instead configure a recursive server (or both
+roles); recursive mode asks for the comma-separated IP addresses of its root
+DNS servers. Add application records afterward with `dnsctl record add`.
 
 The Player Tracker site requires an Advanced Peripherals Player Detector
 attached to the server computer. Open it in Niobium, enter an online Minecraft

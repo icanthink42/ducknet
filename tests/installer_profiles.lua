@@ -131,6 +131,31 @@ assert(load(server["/startup/zz-systemdck.lua"], "=systemdck-startup"))
 local serverUnit = assert(load(server["/etc/systemdck/ducknet-server.lua"], "=server-unit"))()
 assert(serverUnit.program == "/ducknet/bin/serve.lua" and serverUnit.enabled)
 
+local dns = runProfile("dns", {
+  "", "dns", "", "", "", "", "", "", "", "", "", "", ""
+})
+assert(dns["/ducknet/bin/dnsd.lua"], "DNS profile did not install the DNS server")
+assert(dns["/ducknet/bin/dnsctl.lua"], "DNS profile did not install DNS administration")
+assert(not dns["/ducknet/bin/serve.lua"], "DNS profile unexpectedly installed web serving")
+local dnsNetwork = assert(load(dns["/etc/ducknet/config.lua"], "=dns-network"))()
+assert(dnsNetwork.ip.address == "10.0.0.53")
+local dnsConfig = assert(load(dns["/etc/ducknet/dns.lua"], "=dns-config"))()
+assert(not dnsConfig.recursive and #dnsConfig.zones == 1)
+assert(dnsConfig.zones[1].name == "duck")
+assert(dnsConfig.zones[1].records[3].value == "10.0.0.53")
+local dnsUnit = assert(load(dns["/etc/systemdck/ducknet-dns.lua"], "=dns-unit"))()
+assert(dnsUnit.program == "/ducknet/bin/dnsd.lua" and dnsUnit.enabled)
+assert(dnsUnit.arguments[2] == "/etc/ducknet/dns.lua")
+
+local recursiveDNS = runProfile("dns", {
+  "", "dns", "", "", "", "", "", "", "recursive", "1.0.0.53, 2.0.0.53"
+})
+local recursiveConfig = assert(load(recursiveDNS["/etc/ducknet/dns.lua"],
+  "=recursive-dns-config"))()
+assert(recursiveConfig.recursive and #recursiveConfig.zones == 0)
+assert(recursiveConfig.roots[1] == "1.0.0.53")
+assert(recursiveConfig.roots[2] == "2.0.0.53")
+
 _G.fs, _G.http, _G.peripheral, _G.shell = original.fs, original.http,
   original.peripheral, original.shell
 io.read, os.pullEvent = original.read, original.pullEvent
