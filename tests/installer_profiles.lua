@@ -67,7 +67,9 @@ local clientConfig = assert(load(client["/etc/ducknet/config.lua"], "=client-con
 assert(clientConfig.ip.address == "0.0.0.0")
 assert(clientConfig.link.modem == "left")
 assert(clientConfig.dhcp.client.enabled)
-assert(client["/startup/10-ducknet-dhcp.lua"], "client did not enable DHCP startup")
+assert(client["/startup/10-systemdck.lua"], "client did not install systemdck startup")
+assert(client["/etc/systemdck/ducknet-network.lua"], "client did not enable network service")
+assert(client["/ducknet/bin/systemdck.lua"], "client did not install systemdck")
 
 local router = runProfile("router", {
   "", "router", "home", "", "", "left", "11.0.0.0/24", "", "",
@@ -94,9 +96,10 @@ assert(routerConfig.routes[1].interface == "transit1")
 assert(routerConfig.dhcp.pools[1].interface == "lan")
 assert(routerConfig.dhcp.pools[1].first == "11.0.0.100")
 assert(routerConfig.dhcp.pools[1].last == "11.0.0.200")
-assert(router["/startup/ducknet-router.lua"], "router startup was not installed")
-assert(load(router["/startup/ducknet-router.lua"], "=router-startup"))
-assert(router["/startup/ducknet-router.lua"]:find("/ducknet/bin/router.lua", 1, true))
+assert(router["/startup/10-systemdck.lua"], "router service startup was not installed")
+assert(load(router["/startup/10-systemdck.lua"], "=systemdck-startup"))
+local routerUnit = assert(load(router["/etc/systemdck/ducknet-router.lua"], "=router-unit"))()
+assert(routerUnit.program == "/ducknet/bin/router.lua" and routerUnit.enabled)
 
 local transit = runProfile("router", {
   "", "router", "transit", "", "", "left", "10.255.0.0/30", "first", "",
@@ -119,9 +122,10 @@ assert(server["/ducknet/bin/serve.lua"], "server runtime was not installed")
 assert(server["/etc/ducknet/site.lua"]:find("DuckNet Player Tracker", 1, true))
 assert(server["/ducknet/share/sites/foo-bar.lua"], "Foo Bar site was not bundled")
 assert(server["/ducknet/share/sites/player-tracker.lua"], "Player Tracker site was not bundled")
-assert(server["/startup/ducknet-server.lua"], "server startup was not installed")
-assert(load(server["/startup/ducknet-server.lua"], "=server-startup"))
-assert(server["/startup/ducknet-server.lua"]:find("/ducknet/bin/serve.lua", 1, true))
+assert(server["/startup/10-systemdck.lua"], "server service startup was not installed")
+assert(load(server["/startup/10-systemdck.lua"], "=systemdck-startup"))
+local serverUnit = assert(load(server["/etc/systemdck/ducknet-server.lua"], "=server-unit"))()
+assert(serverUnit.program == "/ducknet/bin/serve.lua" and serverUnit.enabled)
 
 _G.fs, _G.http, _G.peripheral, _G.shell = original.fs, original.http,
   original.peripheral, original.shell

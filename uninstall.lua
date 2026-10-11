@@ -28,6 +28,15 @@ local function askYes(prompt)
   return answer and answer:lower():sub(1, 1) == "y"
 end
 
+if isComputerCraft and shell and exists("/ducknet/bin/systemdck.lua") then
+  for _, service in ipairs({ "ducknet-network", "ducknet-router", "ducknet-server" }) do
+    if exists("/etc/systemdck/" .. service .. ".lua") then
+      pcall(shell.run, "/ducknet/bin/systemdck.lua", "stop", service)
+    end
+  end
+  if type(sleep) == "function" then sleep(0.1) end
+end
+
 if not isComputerCraft then
   local ok, shell = pcall(require, "shell")
   if ok then
@@ -46,12 +55,14 @@ local common = isComputerCraft and {
   "/duck-ping.lua", "/duck-traceroute.lua", "/duck-router.lua",
   "/duckserve.lua", "/startup/ducknet-router.lua",
   "/startup/ducknet-server.lua", "/startup/00-ducknet-path.lua",
-  "/startup/10-ducknet-dhcp.lua"
+  "/startup/10-ducknet-dhcp.lua", "/startup/10-systemdck.lua",
+  "/etc/systemdck", "/var/run/systemdck"
 } or {
   "/usr/lib/ducknet.lua", "/usr/lib/ducknet", "/usr/lib/niobium",
   "/usr/share/ducknet", "/usr/bin/ip.lua", "/usr/bin/ipconfig.lua", "/usr/bin/route.lua",
   "/usr/bin/arp.lua", "/usr/bin/ping.lua", "/usr/bin/traceroute.lua",
   "/usr/bin/dltp.lua", "/usr/bin/dhclient.lua", "/usr/bin/dhcpd.lua",
+  "/usr/bin/systemdck.lua", "/usr/bin/systemdck-run.lua", "/usr/bin/networkd.lua",
   "/usr/bin/router.lua", "/usr/bin/serve.lua",
   "/usr/bin/niobium.lua", "/usr/bin/uninstall-ducknet.lua",
   "/usr/bin/duck-ipconfig.lua", "/usr/bin/duck-route.lua",

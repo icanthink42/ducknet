@@ -43,6 +43,7 @@ jobs:
           lua tests/ip_command.lua .
           lua tests/player_tracker.lua .
           lua tests/dhcp.lua .
+          lua tests/systemdck.lua .
 
       - name: Build self-contained installer
         run: |

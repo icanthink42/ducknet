@@ -57,17 +57,21 @@ end
 local function installStartup(configPath)
   configPath = configPath or "/etc/ducknet/config.lua"
   if type(fs) == "table" then
-    if not fs.exists("/startup") then fs.makeDir("/startup") end
-    local file = assert(fs.open("/startup/10-ducknet-dhcp.lua", "w"))
+    fs.makeDir("/etc/systemdck")
+    fs.makeDir("/startup")
+    assert(config.save({
+      description = "DuckNet network configuration and DHCP renewal",
+      program = "/ducknet/bin/networkd.lua", arguments = { configPath },
+      enabled = true, restart = "always", restartDelay = 5
+    }, "/etc/systemdck/ducknet-network.lua"))
+    local file = assert(fs.open("/startup/10-systemdck.lua", "w"))
     file.write("if multishell then\n" ..
-      "  multishell.launch({}, \"/ducknet/bin/dhclient.lua\", \"daemon\", " ..
-        string.format("%q", configPath) .. ")\n" ..
+      "  shell.run(\"/ducknet/bin/systemdck.lua\", \"start-enabled\")\n" ..
       "else\n" ..
-      "  print(\"Renewing DuckNet DHCP lease...\")\n" ..
-      "  shell.run(\"/ducknet/bin/dhclient.lua\", \"renew\", " ..
-        string.format("%q", configPath) .. ")\n" ..
+      "  printError(\"systemdck requires an advanced computer\")\n" ..
       "end\n")
     file.close()
+    if fs.exists("/startup/10-ducknet-dhcp.lua") then fs.delete("/startup/10-ducknet-dhcp.lua") end
     return
   end
   local servicePath = "/etc/rc.d/ducknet-dhcp.lua"
@@ -202,6 +206,9 @@ if action == "release" then
   local settings, path = load(arguments[2])
   local client = settings.dhcp and settings.dhcp.client
   assert(client and client.enabled, "DHCP client is not enabled")
+  if type(fs) == "table" and fs.exists("/ducknet/bin/systemdck.lua") then
+    pcall(shell.run, "/ducknet/bin/systemdck.lua", "stop", "ducknet-network")
+  end
   local _, _, udp = temporaryStack(client.modem, client.channel or 4660)
   DHCP.Client.release(udp, client.id, client.address)
   client.enabled = false
@@ -213,8 +220,12 @@ if action == "release" then
     end
   end
   assert(config.save(settings, path))
-  if type(fs) == "table" and fs.exists("/startup/10-ducknet-dhcp.lua") then
-    fs.delete("/startup/10-ducknet-dhcp.lua")
+  if type(fs) == "table" then
+    if fs.exists("/startup/10-ducknet-dhcp.lua") then fs.delete("/startup/10-ducknet-dhcp.lua") end
+    if fs.exists("/etc/systemdck/ducknet-network.lua") then
+      local unit = config.load("/etc/systemdck/ducknet-network.lua")
+      if unit then unit.enabled = false config.save(unit, "/etc/systemdck/ducknet-network.lua") end
+    end
   elseif type(fs) ~= "table" then
     local ok, filesystem = pcall(require, "filesystem")
     if ok and filesystem.exists("/etc/rc.d/ducknet-dhcp.lua") then

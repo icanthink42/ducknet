@@ -46,6 +46,9 @@ local packages = {
   },
   tools = {
     { "ducknet/lib/ducknet/cli.lua", "/usr/lib/ducknet/cli.lua" },
+    { "ducknet/bin/systemdck.lua", "/usr/bin/systemdck.lua" },
+    { "ducknet/bin/systemdck-run.lua", "/usr/bin/systemdck-run.lua" },
+    { "ducknet/bin/networkd.lua", "/usr/bin/networkd.lua" },
     { "ducknet/bin/ip.lua", "/usr/bin/ip.lua" },
     { "ducknet/bin/dhclient.lua", "/usr/bin/dhclient.lua" },
     { "ducknet/bin/dhcpd.lua", "/usr/bin/dhcpd.lua" },
@@ -590,17 +593,32 @@ local function configureStartup(role)
   assert(role == "router" or role == "server", "invalid startup role")
   if isComputerCraft then
     makeDirectory("/startup")
-    local opposite = role == "router" and "/startup/ducknet-server.lua" or
-      "/startup/ducknet-router.lua"
+    makeDirectory("/etc/systemdck")
+    local oppositeRole = role == "router" and "server" or "router"
+    local opposite = "/etc/systemdck/ducknet-" .. oppositeRole .. ".lua"
     if exists(opposite) then remove(opposite) end
+    local legacyOpposite = "/startup/ducknet-" .. oppositeRole .. ".lua"
+    if exists(legacyOpposite) then remove(legacyOpposite) end
+    local legacy = "/startup/ducknet-" .. role .. ".lua"
+    if exists(legacy) then remove(legacy) end
     local program = role == "router" and "/ducknet/bin/router.lua" or
       "/ducknet/bin/serve.lua"
-    local arguments = role == "server" and (", " .. quote("/etc/ducknet/site.lua")) or ""
-    local body = "print(" .. quote("Starting DuckNet " .. role .. "...") .. ")\n" ..
-      "local ok = shell.run(" .. quote(program) .. arguments .. ")\n" ..
-      "if not ok then printError(" .. quote("DuckNet " .. role .. " stopped") .. ") end\n"
-    assert(load(body, "=ducknet-startup"))
-    writeAtomic("/startup/ducknet-" .. role .. ".lua", body)
+    local arguments = role == "server" and "{ \"/etc/ducknet/site.lua\" }" or "{}"
+    local body = "return {\n" ..
+      "  description = " .. quote("DuckNet " .. role) .. ",\n" ..
+      "  program = " .. quote(program) .. ",\n" ..
+      "  arguments = " .. arguments .. ",\n" ..
+      "  enabled = true, restart = \"always\", restartDelay = 2,\n" ..
+      "}\n"
+    assert(load(body, "=systemdck-unit"))
+    writeAtomic("/etc/systemdck/ducknet-" .. role .. ".lua", body)
+    local boot = [[if multishell then
+  shell.run("/ducknet/bin/systemdck.lua", "start-enabled")
+else
+  printError("systemdck requires an advanced computer")
+end
+]]
+    writeAtomic("/startup/10-systemdck.lua", boot)
   else
     local opposite = role == "router" and "ducknet-server" or "ducknet-router"
     local oppositePath = "/etc/rc.d/" .. opposite .. ".lua"
@@ -643,14 +661,23 @@ end
 local function configureClientDHCPStartup()
   if isComputerCraft then
     makeDirectory("/startup")
+    makeDirectory("/etc/systemdck")
+    local unit = [[return {
+  description = "DuckNet network configuration and DHCP renewal",
+  program = "/ducknet/bin/networkd.lua",
+  arguments = { "/etc/ducknet/config.lua" },
+  enabled = true, restart = "always", restartDelay = 5,
+}
+]]
+    writeAtomic("/etc/systemdck/ducknet-network.lua", unit)
     local body = [[if multishell then
-  multishell.launch({}, "/ducknet/bin/dhclient.lua", "daemon", "/etc/ducknet/config.lua")
+  shell.run("/ducknet/bin/systemdck.lua", "start-enabled")
 else
-  print("Acquiring DuckNet DHCP lease...")
-  shell.run("/ducknet/bin/dhclient.lua", "renew", "/etc/ducknet/config.lua")
+  printError("systemdck requires an advanced computer")
 end
 ]]
-    writeAtomic("/startup/10-ducknet-dhcp.lua", body)
+    writeAtomic("/startup/10-systemdck.lua", body)
+    if exists("/startup/10-ducknet-dhcp.lua") then remove("/startup/10-ducknet-dhcp.lua") end
     return
   end
   local body = [[local worker
@@ -683,9 +710,9 @@ if profile == "router" or profile == "server" then configureStartup(profile) end
 io.write("\nDuckNet installed for " .. (isComputerCraft and "CC:Tweaked" or "OpenComputers") ..
   " from " .. (useBundle and "release " or "branch ") .. branch .. ".\n")
 if profile == "router" then
-  io.write("Start routing with: router\n")
+  io.write("Reboot to start routing, or run: systemdck start ducknet-router\n")
 elseif profile == "server" then
-  io.write("Start the server with: serve /etc/ducknet/site.lua\n")
+  io.write("Reboot to start the server, or run: systemdck start ducknet-server\n")
 elseif profile == "client" then
   io.write("Reboot to acquire a DHCP address, then open a site with Niobium.\n")
 end

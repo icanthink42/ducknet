@@ -8,6 +8,9 @@ local files = {
   ["/ducknet/bin/uninstall-ducknet.lua"] = "program",
   ["/startup/00-ducknet-path.lua"] = "path startup",
   ["/startup/10-ducknet-dhcp.lua"] = "dhcp startup",
+  ["/startup/10-systemdck.lua"] = "systemdck startup",
+  ["/etc/systemdck/ducknet-network.lua"] = "network service",
+  ["/var/run/systemdck/ducknet-network.lua"] = "network state",
   ["/startup/ducknet-server.lua"] = "startup",
   ["/etc/ducknet/config.lua"] = "config"
 }
@@ -41,6 +44,9 @@ assert(not files["/ducknet/lib/ducknet/codec.lua"] and not files["/ducknet/bin/p
 assert(not files["/startup/ducknet-server.lua"])
 assert(not files["/startup/00-ducknet-path.lua"])
 assert(not files["/startup/10-ducknet-dhcp.lua"])
+assert(not files["/startup/10-systemdck.lua"])
+assert(not files["/etc/systemdck/ducknet-network.lua"])
+assert(not files["/var/run/systemdck/ducknet-network.lua"])
 assert(not shellPath:find("/ducknet/bin", 1, true))
 assert(files["/etc/ducknet/config.lua"], "configuration should be preserved after 'no'")
 

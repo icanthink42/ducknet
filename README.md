@@ -64,9 +64,9 @@ The server profile can activate the bundled Foo Bar test, Hello World site, or
 interactive Player Tracker, or download a DuckNet server application from a
 GitHub raw/blob URL. Start a
 configured server with `serve /etc/ducknet/site.lua`, or a router with
-`router`. Router and server profiles also install and enable the matching
-startup service automatically. Rebooting the computer resumes its configured
-role without another command.
+`router`. Client, router, and server profiles install their long-running work as
+`systemdck` services. Rebooting an advanced computer starts enabled services,
+and failed services are restarted automatically.
 
 The Player Tracker site requires an Advanced Peripherals Player Detector
 attached to the server computer. Open it in Niobium, enter an online Minecraft
@@ -118,6 +118,13 @@ dhclient configure <modem> [channel]   enable DHCP for acquisition at startup
 dhclient renew                         renew the current DHCP lease
 dhclient status                        show the current lease
 dhclient release                       return and disable the current lease
+systemdck list                         list installed background services
+systemdck status <service>             show service state and restart count
+systemdck start|stop|restart <service> control a service immediately
+systemdck enable|disable <service>     control whether a service starts at boot
+systemdck create <name> <program> [args...]
+                                        create and enable a custom service
+systemdck remove <service>             stop and remove a custom service
 ipconfig [config]                      adapter information
 route [destination] [config]           routing table or route lookup
 arp [config]                           logical IP to modem mappings
@@ -131,6 +138,31 @@ uninstall-ducknet                      remove DuckNet
 
 The uninstaller removes libraries, programs, and startup services, then asks
 separately before deleting `/etc/ducknet` configuration and website data.
+
+## Background services
+
+`systemdck` is DuckNet's small service supervisor for advanced CC:Tweaked
+computers. It uses multishell tabs as isolated background tasks, records service
+state under `/var/run/systemdck`, restarts failed programs, and starts enabled
+unit files from `/etc/systemdck` during boot. Installed profiles create these
+units automatically:
+
+- `ducknet-network` acquires and renews a client's DHCP lease
+- `ducknet-router` runs packet forwarding and the DHCP server
+- `ducknet-server` runs the configured website
+
+For example:
+
+```text
+systemdck list
+systemdck status ducknet-network
+systemdck restart ducknet-router
+systemdck disable ducknet-server
+```
+
+Basic computers do not provide multishell and therefore cannot run background
+services alongside an interactive shell. They can still run DuckNet programs in
+the foreground; use an advanced computer for an automatically managed node.
 
 ## DHCP
 
