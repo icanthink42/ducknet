@@ -1,7 +1,7 @@
 local root = (... and ... ~= "" and ...) or "."
 package.path = root .. "/ducknet/lib/?.lua;" .. root .. "/ducknet/lib/?/init.lua;" .. package.path
-local originalFs, originalParallel, originalTerm, originalColors =
-  _G.fs, _G.parallel, _G.term, _G.colors
+local originalFs, originalParallel, originalTerm, originalColors, originalShell =
+  _G.fs, _G.parallel, _G.term, _G.colors, _G.shell
 local originalQueueEvent, originalPullEvent, originalStartTimer =
   os.queueEvent, os.pullEvent, os.startTimer
 local originalPullEventRaw = os.pullEventRaw
@@ -59,21 +59,37 @@ _G.fs = {
 }
 _G.parallel = {}
 _G.colors = { white = 1, black = 32768 }
+local terminalRows, terminalCursor, redirected = {}, { 1, 1 }
 local nativeTerminal = {
-  getSize = function() return 51, 19 end,
+  getSize = function() return 12, 4 end,
   getTextColor = function() return 1 end,
   getBackgroundColor = function() return 32768 end,
-  setCursorPos = function() end,
+  setCursorPos = function(x, y) terminalCursor = { x, y } end,
   setCursorBlink = function() end,
-  blit = function() end,
+  blit = function(text) terminalRows[terminalCursor[2]] = text end,
   isColor = function() return true end,
   setPaletteColor = function() end,
   getPaletteColor = function() return 0, 0, 0 end,
   nativePaletteColor = function() return 0, 0, 0 end
 }
 _G.term = {
-  current = function() return nativeTerminal end,
-  redirect = function() return nativeTerminal end
+  current = function() return redirected or nativeTerminal end,
+  redirect = function(target)
+    local previous = redirected or nativeTerminal
+    redirected = target
+    return previous
+  end
+}
+_G.shell = {
+  run = function(command)
+    assert(command == "shell")
+    for index = 1, 8 do
+      redirected.setCursorPos(1, 4)
+      redirected.write("line " .. index)
+      redirected.scroll(1)
+    end
+    while true do coroutine.yield() end
+  end
 }
 os.queueEvent = function(event, token, requested, name)
   if event == "systemdck_request" then
@@ -124,12 +140,11 @@ records["/var/run/systemdck/worker.lua"] = { state = "inactive" }
 program("remove", "worker")
 assert(not records["/etc/systemdck/worker.lua"])
 
--- Boot builds one manager, one interactive shell, sixteen workers, and the
--- console scrollback controller.
+-- Boot builds one manager, one interactive shell, and sixteen workers.
 local bootTasks, serviceEnvironment
 records["/etc/systemdck/demo.lua"].restart = "no"
 _G.parallel.waitForAll = function(...)
-  assert(select("#", ...) == 19, "unexpected systemdck task count")
+  assert(select("#", ...) == 18, "unexpected systemdck task count")
   bootTasks = { ... }
 end
 program("boot")
@@ -151,9 +166,22 @@ assert(type(serviceEnvironment.require) == "function")
 assert(serviceEnvironment._G == serviceEnvironment)
 assert(records["/var/run/systemdck/demo.lua"].state == "inactive")
 
+-- Scroll events are processed inside the foreground shell scheduler before
+-- they are forwarded to CraftOS, so the retained terminal is always redrawn.
+local rawEvents = { { "mouse_scroll", -1 } }
+os.pullEventRaw = function()
+  local nextEvent = table.remove(rawEvents, 1)
+  if not nextEvent then return coroutine.yield() end
+  return table.unpack(nextEvent)
+end
+local interactive = coroutine.create(bootTasks[2])
+assert(coroutine.resume(interactive))
+assert(coroutine.status(interactive) == "suspended")
+assert(terminalRows[1]:match("line 5"), "mouse wheel did not reveal retained output")
+
 -- Ctrl+T reaches the foreground shell, but background environments and the
 -- supervisor ignore the broadcast terminate event.
-local rawEvents = {
+rawEvents = {
   { "terminate" },
   { "modem_message", "left" },
 }
@@ -175,7 +203,7 @@ assert(not source:find("multishell", 1, true))
 assert(not source:find("os.run", 1, true))
 
 _G.fs, _G.parallel = originalFs, originalParallel
-_G.term, _G.colors = originalTerm, originalColors
+_G.term, _G.colors, _G.shell = originalTerm, originalColors, originalShell
 os.queueEvent, os.pullEvent, os.startTimer =
   originalQueueEvent, originalPullEvent, originalStartTimer
 os.pullEventRaw = originalPullEventRaw

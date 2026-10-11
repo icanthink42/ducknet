@@ -282,28 +282,45 @@ local function runSupervisor()
   local function interactiveShell()
     term.redirect(console.terminal)
     while true do
-      shell.run("shell")
-      sleep(0)
-    end
-  end
-
-  local function scrollbackController()
-    while true do
-      local event, value = os.pullEventRaw()
-      if event == "mouse_scroll" then
-        console:view(-value)
-      elseif event == "term_resize" then
-        console:resize()
-      elseif event == "key" and type(keys) == "table" then
-        if value == keys.pageUp then console:view(math.max(1, math.floor(console.height / 2)))
-        elseif value == keys.pageDown then console:view(-math.max(1, math.floor(console.height / 2)))
-        elseif value == keys.home then console:view(1000)
-        elseif value == keys["end"] then console:follow()
-        else console:follow()
+      local shellTask = coroutine.create(function() shell.run("shell") end)
+      local filter
+      local event = { n = 0 }
+      while coroutine.status(shellTask) ~= "dead" do
+        local forward = true
+        if event[1] == "mouse_scroll" then
+          console:view(-event[2])
+        elseif event[1] == "term_resize" then
+          console:resize()
+        elseif event[1] == "key" and type(keys) == "table" then
+          if event[2] == keys.pageUp then
+            console:view(math.max(1, math.floor(console.height / 2)))
+            forward = false
+          elseif event[2] == keys.pageDown then
+            console:view(-math.max(1, math.floor(console.height / 2)))
+            forward = false
+          elseif event[2] == keys.home then
+            console:view(1000)
+            forward = false
+          elseif event[2] == keys["end"] then
+            console:follow()
+            forward = false
+          else
+            console:follow()
+          end
+        elseif event[1] == "char" or event[1] == "paste" then
+          console:follow()
         end
-      elseif event == "char" or event == "paste" then
-        console:follow()
+
+        if forward and (filter == nil or filter == event[1] or event[1] == "terminate") then
+          local resumed, nextFilter = coroutine.resume(shellTask, unpack(event, 1, event.n))
+          if not resumed then error(nextFilter, 0) end
+          filter = nextFilter
+        end
+        if coroutine.status(shellTask) ~= "dead" then
+          event = table.pack(os.pullEventRaw())
+        end
       end
+      sleep(0)
     end
   end
 
@@ -312,7 +329,6 @@ local function runSupervisor()
     local workerIndex = index
     tasks[#tasks + 1] = function() worker(workerIndex) end
   end
-  tasks[#tasks + 1] = scrollbackController
   parallel.waitForAll(unpack(tasks))
 end
 
