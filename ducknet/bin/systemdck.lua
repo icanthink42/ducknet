@@ -90,6 +90,7 @@ local function appendLog(name, text)
 end
 
 local function serviceEnvironment(name)
+  local parentEnvironment = _ENV
   local function values(...)
     local result = {}
     for index = 1, select("#", ...) do result[index] = tostring(select(index, ...)) end
@@ -106,7 +107,7 @@ local function serviceEnvironment(name)
     write = function(value) appendLog(name, tostring(value)) end,
     io = serviceIO
   }
-  setmetatable(environment, { __index = _G })
+  setmetatable(environment, { __index = parentEnvironment })
   environment._G = environment
   return environment
 end

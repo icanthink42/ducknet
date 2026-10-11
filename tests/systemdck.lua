@@ -69,7 +69,16 @@ os.pullEvent = function()
 end
 os.startTimer = function() return 99 end
 
-local program = assert(loadfile(root .. "/ducknet/bin/systemdck.lua"))
+-- CraftOS program environments contain package, while their _G base may not.
+-- Keep those tables distinct so inheriting the wrong one fails this test.
+local craftGlobal = {}
+for key, value in pairs(_G) do
+  if key ~= "package" then craftGlobal[key] = value end
+end
+craftGlobal._G = craftGlobal
+local programEnvironment = setmetatable({ package = package }, { __index = craftGlobal })
+programEnvironment._G = craftGlobal
+local program = assert(loadfile(root .. "/ducknet/bin/systemdck.lua", "t", programEnvironment))
 program("status", "demo")
 program("start", "demo")
 program("restart", "demo")
