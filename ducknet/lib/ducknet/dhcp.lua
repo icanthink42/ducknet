@@ -46,18 +46,13 @@ function DHCP.server(udp, ip, options)
     udp = udp, ip = ip, pools = {}, offers = {},
     leases = stored and stored.leases or {},
     leasePath = options.leasePath or "/etc/ducknet/dhcp-leases.lua",
-    clock = options.clock or now,
-    log = options.log
+    clock = options.clock or now
   }, Server)
   for _, pool in ipairs(options.pools or {}) do self:addPool(pool) end
   udp:on(DHCP.SERVER_PORT, function(datagram)
     return self:_handle(datagram)
   end)
   return self
-end
-
-function Server:_log(message)
-  if self.log then pcall(self.log, message) end
 end
 
 function Server:addPool(pool)
@@ -133,7 +128,6 @@ function Server:_handle(datagram)
   if not pool then return true end
 
   if message.type == "discover" then
-    self:_log("DISCOVER from " .. message.clientId .. " on " .. pool.interface)
     local offered = self:_allocate(pool, message.clientId)
     if not offered then
       self:_reply(pool.interface, { type = "nak", xid = message.xid,
@@ -144,7 +138,6 @@ function Server:_handle(datagram)
       clientId = message.clientId, address = offered,
       interface = pool.interface, expires = self.clock() + 30
     }
-    self:_log("OFFER " .. offered .. " to " .. message.clientId)
     self:_reply(pool.interface, {
       type = "offer", xid = message.xid, clientId = message.clientId,
       address = offered, prefix = pool.prefix, gateway = pool.gateway,
@@ -154,7 +147,6 @@ function Server:_handle(datagram)
   end
 
   if message.type == "request" then
-    self:_log("REQUEST " .. tostring(message.address) .. " from " .. message.clientId)
     local localServer = self.ip.interfaceByName[pool.interface].address
     if message.server and message.server ~= localServer then return true end
     local offer = self.offers[message.xid]
@@ -171,7 +163,6 @@ function Server:_handle(datagram)
     }
     self.offers[message.xid] = nil
     self:_save()
-    self:_log("ACK " .. offer.address .. " to " .. message.clientId)
     self:_reply(pool.interface, {
       type = "ack", xid = message.xid, clientId = message.clientId,
       address = offer.address, prefix = pool.prefix, gateway = pool.gateway,

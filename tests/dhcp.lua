@@ -28,10 +28,8 @@ local ip = {
   }
 }
 local clock = 1000
-local serverLog = {}
 local server = DHCP.server(udp, ip, {
   leasePath = leasePath, clock = function() return clock end,
-  log = function(message) serverLog[#serverLog + 1] = message end,
   pools = {
     { interface = "lan", first = "11.0.0.100", last = "11.0.0.101",
       network = "11.0.0.0/24", gateway = "11.0.0.1", lease = 3600 }
@@ -52,7 +50,6 @@ handler({ interface = "lan", payload = DHCP._encode({
 local ack = DHCP._decode(sent[#sent].payload)
 assert(ack.type == "ack" and ack.address == "11.0.0.100")
 assert(server.leases["11.0.0.100"].clientId == "cc:2")
-assert(serverLog[1]:match("DISCOVER") and serverLog[#serverLog]:match("ACK"))
 
 -- Exercise the client DORA state machine with a deterministic fake transport.
 local pending, phase
