@@ -46,6 +46,7 @@ jobs:
           lua tests/player_tracker.lua .
           lua tests/dhcp.lua .
           lua tests/systemdck.lua .
+          lua tests/niobium_command.lua .
 
       - name: Build self-contained installer
         run: |

@@ -61,6 +61,7 @@ local packages = {
   niobium = {
     { "niobium/lib/niobium/sandbox.lua", "/usr/lib/niobium/sandbox.lua" },
     { "niobium/lib/niobium/ui.lua", "/usr/lib/niobium/ui.lua" },
+    { "niobium/lib/niobium/url.lua", "/usr/lib/niobium/url.lua" },
     { "niobium/bin/niobium.lua", "/usr/bin/niobium.lua" }
   }
 }

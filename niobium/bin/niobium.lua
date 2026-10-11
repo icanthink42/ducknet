@@ -2,16 +2,15 @@ local config = require("ducknet.config")
 local ducknet = require("ducknet")
 local Sandbox = require("niobium.sandbox")
 local UI = require("niobium.ui")
+local URL = require("niobium.url")
 
 local arguments = { ... }
 local url = arguments[1]
 if not url then
-  io.stderr:write("usage: niobium dltp://10.0.0.2/path [config.lua]\n")
-  return
+  io.write("DuckNet URL: ")
+  url = io.read()
 end
-local host, path = url:match("^dltp://([^/]+)(/.*)$")
-if not host then host, path = url:match("^([^/]+)(/.*)$") end
-if not host then error("invalid DuckNet URL", 0) end
+local host, path = URL.parse(url)
 
 local settings = assert(config.load(arguments[2]))
 local stack = ducknet.stack(settings)

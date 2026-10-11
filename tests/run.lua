@@ -10,10 +10,22 @@ local TCP = require("ducknet.tcp")
 local DLTP = require("ducknet.dltp")
 local Sandbox = require("niobium.sandbox")
 local UI = require("niobium.ui")
+local URL = require("niobium.url")
 
 local function equal(left, right, message)
   assert(left == right, (message or "values differ") .. ": " .. tostring(left) .. " ~= " .. tostring(right))
 end
+
+local urlHost, urlPath = URL.parse("10.0.0.2")
+equal(urlHost, "10.0.0.2")
+equal(urlPath, "/")
+urlHost, urlPath = URL.parse("dltp://10.0.0.2/players/Alex")
+equal(urlHost, "10.0.0.2")
+equal(urlPath, "/players/Alex")
+urlHost, urlPath = URL.parse("dltp://10.0.0.2")
+equal(urlHost, "10.0.0.2")
+equal(urlPath, "/")
+assert(not pcall(URL.parse, "http://10.0.0.2"))
 
 local encoded = codec.encode({ hello = "world\0!", answer = 42, nested = { true, false } })
 local decoded = codec.decode(encoded)
