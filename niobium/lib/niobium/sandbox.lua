@@ -41,13 +41,17 @@ end
 function Sandbox:run(source, capabilities, chunkName)
   assert(type(source) == "string", "site source must be a string")
   local environment = self:_environment(capabilities)
-  local chunk, compileError = load(source, chunkName or "=ducknet-site", "t", environment)
+  local sourceName = chunkName or "=ducknet-site"
+  local chunk, compileError = load(source, sourceName, "t", environment)
   if not chunk then return nil, compileError end
 
   local used = 0
   local function meter()
-    used = used + 1000
-    if used > self.instructionLimit then error("site exceeded instruction limit", 0) end
+    local running = debug.getinfo(2, "S")
+    if not running or running.source == sourceName then
+      used = used + 1000
+      if used > self.instructionLimit then error("site exceeded instruction limit", 0) end
+    end
   end
   local canMeter = debug and type(debug.sethook) == "function"
   if canMeter then debug.sethook(meter, "", 1000) end

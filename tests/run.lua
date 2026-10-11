@@ -242,6 +242,14 @@ local ok = sandbox:run([[require("component")]])
 assert(not ok)
 local quotaOk = sandbox:run([[while true do end]])
 assert(not quotaOk)
+local trustedWork = Sandbox.new({ instructionLimit = 1000, modules = {
+  trusted = function()
+    local total = 0
+    for index = 1, 100000 do total = total + index end
+    return total
+  end
+} })
+assert(trustedWork:run([[local trusted=require("trusted"); assert(trusted() > 0)]]))
 
 -- The CC:Tweaked adapter targets logical next hops over a shared modem channel.
 local savedPeripheral = _G.peripheral
