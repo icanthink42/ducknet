@@ -11,6 +11,7 @@ local DLTP = require("ducknet.dltp")
 local Sandbox = require("niobium.sandbox")
 local UI = require("niobium.ui")
 local URL = require("niobium.url")
+local ScrollTerm = require("ducknet.scrollterm")
 
 local function equal(left, right, message)
   assert(left == right, (message or "values differ") .. ": " .. tostring(left) .. " ~= " .. tostring(right))
@@ -26,6 +27,31 @@ urlHost, urlPath = URL.parse("dltp://10.0.0.2")
 equal(urlHost, "10.0.0.2")
 equal(urlPath, "/")
 assert(not pcall(URL.parse, "http://10.0.0.2"))
+
+local terminalRows, terminalCursor = {}, { 1, 1 }
+local parentTerminal = {
+  getSize = function() return 8, 3 end,
+  getTextColor = function() return 1 end,
+  getBackgroundColor = function() return 32768 end,
+  setCursorPos = function(x, y) terminalCursor = { x, y } end,
+  setCursorBlink = function() end,
+  blit = function(text) terminalRows[terminalCursor[2]] = text end,
+  isColor = function() return true end,
+  setPaletteColor = function() end,
+  getPaletteColor = function() return 0, 0, 0 end,
+  nativePaletteColor = function() return 0, 0, 0 end
+}
+local scrollback = ScrollTerm.new(parentTerminal, { limit = 10 })
+local scrollTerminal = scrollback.terminal
+scrollTerminal.write("first")
+scrollTerminal.setCursorPos(1, 2)
+scrollTerminal.write("second")
+scrollTerminal.scroll(1)
+scrollback:view(1)
+equal(terminalRows[1]:sub(1, 5), "first")
+equal(terminalRows[2]:sub(1, 6), "second")
+scrollback:follow()
+equal(terminalRows[1]:sub(1, 6), "second")
 
 local encoded = codec.encode({ hello = "world\0!", answer = 42, nested = { true, false } })
 local decoded = codec.decode(encoded)
@@ -212,27 +238,6 @@ assert(sandbox:run([[local ui=require("ui"); ui.write(string.upper("safe"))]], {
 equal(output[1], "SAFE")
 local prompted = UI.new(nil, nil, { reader = function() return "Steve" end }):capability()
 equal(prompted.input(""), "Steve")
-
-local screen, cursor = {}, { 1, 1 }
-local fakeTerm = {
-  getSize = function() return 20, 5 end,
-  setCursorPos = function(x, y) cursor = { x, y } end,
-  clearLine = function() screen[cursor[2]] = "" end,
-  write = function(value) screen[cursor[2]] = (screen[cursor[2]] or "") .. value end,
-  clear = function() screen = {} end,
-  setCursorBlink = function() end
-}
-local browseEvents = { { "mouse_scroll", -2 }, { "char", "q" } }
-local scrolling = UI.new(nil, fakeTerm, {
-  pullEvent = function() return table.unpack(table.remove(browseEvents, 1)) end
-})
-scrolling:clear()
-for index = 1, 6 do scrolling:write("line " .. index) end
-equal(screen[1], "line 3")
-equal(screen[4], "line 6")
-scrolling:browse()
-equal(screen[1], "line 1")
-equal(scrolling.top, 1)
 local ok = sandbox:run([[require("component")]])
 assert(not ok)
 local quotaOk = sandbox:run([[while true do end]])

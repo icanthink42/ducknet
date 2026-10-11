@@ -168,7 +168,10 @@ systemdck disable ducknet-server
 
 On boot, `systemdck` becomes the parent process and opens a normal interactive
 CraftOS shell as one of its parallel tasks. Service output is logged instead of
-being written over the shell prompt. As with all ComputerCraft cooperative
+being written over the shell prompt. The hosted shell keeps up to 1,000 lines of
+scrollback: use the mouse wheel or Page Up/Page Down to move through it, Home to
+jump to the oldest retained output, and End or any normal typing key to return
+to the live prompt. As with all ComputerCraft cooperative
 multitasking, a service must eventually yield by waiting for an event, sleeping,
 or calling another yielding API; a program that spins forever without yielding
 would stall the whole computer.

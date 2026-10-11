@@ -1,5 +1,7 @@
 local root = (... and ... ~= "" and ...) or "."
-local originalFs, originalParallel = _G.fs, _G.parallel
+package.path = root .. "/ducknet/lib/?.lua;" .. root .. "/ducknet/lib/?/init.lua;" .. package.path
+local originalFs, originalParallel, originalTerm, originalColors =
+  _G.fs, _G.parallel, _G.term, _G.colors
 local originalQueueEvent, originalPullEvent, originalStartTimer =
   os.queueEvent, os.pullEvent, os.startTimer
 local originalPullEventRaw = os.pullEventRaw
@@ -56,6 +58,23 @@ _G.fs = {
   delete = function(path) records[path] = nil end
 }
 _G.parallel = {}
+_G.colors = { white = 1, black = 32768 }
+local nativeTerminal = {
+  getSize = function() return 51, 19 end,
+  getTextColor = function() return 1 end,
+  getBackgroundColor = function() return 32768 end,
+  setCursorPos = function() end,
+  setCursorBlink = function() end,
+  blit = function() end,
+  isColor = function() return true end,
+  setPaletteColor = function() end,
+  getPaletteColor = function() return 0, 0, 0 end,
+  nativePaletteColor = function() return 0, 0, 0 end
+}
+_G.term = {
+  current = function() return nativeTerminal end,
+  redirect = function() return nativeTerminal end
+}
 os.queueEvent = function(event, token, requested, name)
   if event == "systemdck_request" then
     events[#events + 1] = { "systemdck_response", token, true,
@@ -105,11 +124,12 @@ records["/var/run/systemdck/worker.lua"] = { state = "inactive" }
 program("remove", "worker")
 assert(not records["/etc/systemdck/worker.lua"])
 
--- Boot builds one manager, one interactive shell, and sixteen parallel workers.
+-- Boot builds one manager, one interactive shell, sixteen workers, and the
+-- console scrollback controller.
 local bootTasks, serviceEnvironment
 records["/etc/systemdck/demo.lua"].restart = "no"
 _G.parallel.waitForAll = function(...)
-  assert(select("#", ...) == 18, "unexpected systemdck task count")
+  assert(select("#", ...) == 19, "unexpected systemdck task count")
   bootTasks = { ... }
 end
 program("boot")
@@ -155,6 +175,7 @@ assert(not source:find("multishell", 1, true))
 assert(not source:find("os.run", 1, true))
 
 _G.fs, _G.parallel = originalFs, originalParallel
+_G.term, _G.colors = originalTerm, originalColors
 os.queueEvent, os.pullEvent, os.startTimer =
   originalQueueEvent, originalPullEvent, originalStartTimer
 os.pullEventRaw = originalPullEventRaw

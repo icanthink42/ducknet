@@ -1,4 +1,5 @@
 local config = require("ducknet.config")
+local ScrollTerm = require("ducknet.scrollterm")
 
 local UNIT_DIR = "/etc/systemdck"
 local STATE_DIR = "/var/run/systemdck"
@@ -129,6 +130,7 @@ local function runSupervisor()
   fs.makeDir(STATE_DIR)
   fs.makeDir(LOG_DIR)
   local assignments, controls = {}, {}
+  local console = ScrollTerm.new(term.current(), { limit = 1000 })
 
   local function findWorker(name)
     for index = 1, WORKERS do
@@ -278,9 +280,30 @@ local function runSupervisor()
   end
 
   local function interactiveShell()
+    term.redirect(console.terminal)
     while true do
       shell.run("shell")
       sleep(0)
+    end
+  end
+
+  local function scrollbackController()
+    while true do
+      local event, value = os.pullEventRaw()
+      if event == "mouse_scroll" then
+        console:view(-value)
+      elseif event == "term_resize" then
+        console:resize()
+      elseif event == "key" and type(keys) == "table" then
+        if value == keys.pageUp then console:view(math.max(1, math.floor(console.height / 2)))
+        elseif value == keys.pageDown then console:view(-math.max(1, math.floor(console.height / 2)))
+        elseif value == keys.home then console:view(1000)
+        elseif value == keys["end"] then console:follow()
+        else console:follow()
+        end
+      elseif event == "char" or event == "paste" then
+        console:follow()
+      end
     end
   end
 
@@ -289,6 +312,7 @@ local function runSupervisor()
     local workerIndex = index
     tasks[#tasks + 1] = function() worker(workerIndex) end
   end
+  tasks[#tasks + 1] = scrollbackController
   parallel.waitForAll(unpack(tasks))
 end
 

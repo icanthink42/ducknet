@@ -23,6 +23,7 @@ local packages = {
     { "ducknet/lib/ducknet/udp.lua", "/usr/lib/ducknet/udp.lua" },
     { "ducknet/lib/ducknet/dhcp.lua", "/usr/lib/ducknet/dhcp.lua" },
     { "ducknet/lib/ducknet/config.lua", "/usr/lib/ducknet/config.lua" },
+    { "ducknet/lib/ducknet/scrollterm.lua", "/usr/lib/ducknet/scrollterm.lua" },
     { "ducknet/etc/ducknet/config.lua", "/etc/ducknet/config.lua", true },
     { "uninstall.lua", "/usr/bin/uninstall-ducknet.lua" }
   },
