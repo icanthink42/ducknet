@@ -212,6 +212,27 @@ assert(sandbox:run([[local ui=require("ui"); ui.write(string.upper("safe"))]], {
 equal(output[1], "SAFE")
 local prompted = UI.new(nil, nil, { reader = function() return "Steve" end }):capability()
 equal(prompted.input(""), "Steve")
+
+local screen, cursor = {}, { 1, 1 }
+local fakeTerm = {
+  getSize = function() return 20, 5 end,
+  setCursorPos = function(x, y) cursor = { x, y } end,
+  clearLine = function() screen[cursor[2]] = "" end,
+  write = function(value) screen[cursor[2]] = (screen[cursor[2]] or "") .. value end,
+  clear = function() screen = {} end,
+  setCursorBlink = function() end
+}
+local browseEvents = { { "mouse_scroll", -2 }, { "char", "q" } }
+local scrolling = UI.new(nil, fakeTerm, {
+  pullEvent = function() return table.unpack(table.remove(browseEvents, 1)) end
+})
+scrolling:clear()
+for index = 1, 6 do scrolling:write("line " .. index) end
+equal(screen[1], "line 3")
+equal(screen[4], "line 6")
+scrolling:browse()
+equal(screen[1], "line 1")
+equal(scrolling.top, 1)
 local ok = sandbox:run([[require("component")]])
 assert(not ok)
 local quotaOk = sandbox:run([[while true do end]])

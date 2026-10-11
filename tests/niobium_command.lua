@@ -6,7 +6,7 @@ local names = { "ducknet.config", "ducknet", "niobium.sandbox", "niobium.ui" }
 local saved = {}
 for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 
-local requests, configPaths, rendered = {}, {}, {}
+local requests, configPaths, rendered, browsed = {}, {}, {}, 0
 package.loaded["ducknet.config"] = {
   load = function(path)
     configPaths[#configPaths + 1] = path or false
@@ -31,7 +31,10 @@ package.loaded["niobium.sandbox"] = {
 }
 package.loaded["niobium.ui"] = {
   new = function()
-    return { capability = function() return {} end }
+    return {
+      capability = function() return {} end,
+      browse = function() browsed = browsed + 1 end
+    }
   end
 }
 
@@ -61,6 +64,7 @@ run("10.0.0.3/site", "/custom.lua")
 assert(reads == 1, "URL argument unexpectedly prompted for input")
 assert(requests[2].host == "10.0.0.3" and requests[2].path == "/site")
 assert(configPaths[2] == "/custom.lua")
+assert(browsed == 2)
 
 for _, name in ipairs(names) do package.loaded[name] = saved[name] end
 io.write("all Niobium command tests passed\n")

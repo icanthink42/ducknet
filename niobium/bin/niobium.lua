@@ -40,3 +40,4 @@ local ok, runtimeError = sandbox:run(response.body, {
   ui = ui:capability(), net = network
 }, "=" .. url)
 if not ok then error("site crashed: " .. tostring(runtimeError), 0) end
+ui:browse()
